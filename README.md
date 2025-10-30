@@ -76,7 +76,7 @@ PS1-GAME/
 │   ├── App.css              # アプリケーションスタイル
 │   ├── main.jsx             # エントリーポイント
 │   ├── index.css            # グローバルスタイル
-│   ├── compornents/         # コンポーネント（注: タイポですが現状このディレクトリ名）
+│   ├── components/         # コンポーネント
 │   │   ├── PlayerController.jsx    # プレイヤー入力・移動制御
 │   │   ├── CollectibleItem.jsx     # 収集可能アイテム
 │   │   ├── Structure.jsx           # 壁・構造物の描画
@@ -96,9 +96,11 @@ PS1-GAME/
 
 ```
 
-> **注意**: 現在、主要なロジックは `src/App.jsx` に統合されています。
-> 各コンポーネントファイル（`src/compornents/`）は存在しますが、まだ `App.jsx` 内で直接定義されています。
-> 今後のリファクタリングで分割を予定しています。
+> **注意**:
+> - 現在、主要なロジックは `src/App.jsx` に統合されています
+> - `src/components/` 配下のファイルは将来のリファクタリング用にディレクトリ構造のみ作成されていますが、現在は空ファイルです
+> - 全てのコンポーネント（PlayerController、CollectibleItem、Structure、Floor、GameUI、NearItemIndicator）は `src/App.jsx` 内で直接定義されています
+> - 今後のリファクタリングで `App.jsx` から各コンポーネントファイルへ分割する予定です
 
 ---
 
