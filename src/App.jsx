@@ -183,6 +183,7 @@ export default function App() {
           items={items}
           collectedItems={collectedItems}
           exitActive={exitActive}
+          cameraYawRef={cameraYawRef}
         />
       )}
     </div>
