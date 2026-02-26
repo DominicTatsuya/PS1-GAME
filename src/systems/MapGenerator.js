@@ -1,3 +1,4 @@
+// 乱数生成器
 function mulberry32(a) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -7,6 +8,7 @@ function mulberry32(a) {
   };
 }
 
+// 迷路生成
 export function generateMaze(mazeW = 10, mazeH = 10, seed = Date.now()) {
   const rng = mulberry32(seed);
   const gridW = mazeW * 2 + 1;
@@ -14,18 +16,23 @@ export function generateMaze(mazeW = 10, mazeH = 10, seed = Date.now()) {
 
   const grid = Array.from({ length: gridH }, () => Array(gridW).fill(1));
 
+  // 迷路の壁を生成
   for (let y = 0; y < mazeH; y++) {
     for (let x = 0; x < mazeW; x++) {
       grid[y * 2 + 1][x * 2 + 1] = 0;
     }
   }
 
+  // 迷路の訪問状態を管理
   const visited = Array.from({ length: mazeH }, () => Array(mazeW).fill(false));
+  // 迷路の探索を管理
   const stack = [];
 
+  // 迷路の探索を開始
   visited[0][0] = true;
   stack.push({ x: 0, y: 0 });
 
+  // 迷路の探索方向を管理
   const dirs = [
     { dx: 0, dy: -1 },
     { dx: 0, dy: 1 },
@@ -33,6 +40,7 @@ export function generateMaze(mazeW = 10, mazeH = 10, seed = Date.now()) {
     { dx: 1, dy: 0 },
   ];
 
+  // 迷路の探索を継続
   while (stack.length > 0) {
     const cur = stack[stack.length - 1];
     const neighbors = [];
@@ -60,6 +68,7 @@ export function generateMaze(mazeW = 10, mazeH = 10, seed = Date.now()) {
   return { grid, gridW, gridH, mazeW, mazeH };
 }
 
+// グリッド座標をワールド座標に変換
 export function gridToWorld(gx, gy, gridW, gridH, cellSize) {
   const offsetX = (gridW * cellSize) / 2;
   const offsetZ = (gridH * cellSize) / 2;
@@ -69,6 +78,7 @@ export function gridToWorld(gx, gy, gridW, gridH, cellSize) {
   };
 }
 
+// ワールド座標をグリッド座標に変換
 export function worldToGrid(wx, wz, gridW, gridH, cellSize) {
   const offsetX = (gridW * cellSize) / 2;
   const offsetZ = (gridH * cellSize) / 2;
@@ -78,6 +88,7 @@ export function worldToGrid(wx, wz, gridW, gridH, cellSize) {
   };
 }
 
+// 行き止まりを見つける
 export function findDeadEnds(grid) {
   const ends = [];
   for (let y = 1; y < grid.length - 1; y += 2) {
@@ -94,6 +105,7 @@ export function findDeadEnds(grid) {
   return ends;
 }
 
+// 交差点を見つける
 export function findJunctions(grid) {
   const junctions = [];
   for (let y = 1; y < grid.length - 1; y += 2) {

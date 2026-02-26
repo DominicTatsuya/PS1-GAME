@@ -216,6 +216,6 @@ npm run lint
 
 MIT License
 
-(c) 2025 ドミニク
+(c) 2025 Dominic Tatsuya
 
 自由に改変・学習・派生作品の作成が可能です。
