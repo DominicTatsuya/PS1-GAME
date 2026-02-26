@@ -236,10 +236,26 @@ export function generateDungeon(seed = Date.now()) {
     }
   }
 
-  const torchCandidates = [...junctions, ...deadEnds.filter((_, i) => i % 2 === 0)];
+  const corridorCells = [];
+  for (let y = 1; y < gridH - 1; y += 2) {
+    for (let x = 1; x < gridW - 1; x += 2) {
+      if (grid[y][x] !== 0) continue;
+      let open = 0;
+      if (grid[y - 1][x] === 0) open++;
+      if (grid[y + 1][x] === 0) open++;
+      if (grid[y][x - 1] === 0) open++;
+      if (grid[y][x + 1] === 0) open++;
+      if (open === 2) corridorCells.push({ gx: x, gy: y });
+    }
+  }
   const rng3 = mulberry32(seed + 77);
+  const torchCandidates = [
+    ...junctions,
+    ...deadEnds,
+    ...corridorCells.filter(() => rng3() < 0.3),
+  ];
   torchCandidates.sort(() => 0.5 - rng3());
-  const torches = torchCandidates.slice(0, Math.min(15, torchCandidates.length)).map((t) => {
+  const torches = torchCandidates.slice(0, Math.min(30, torchCandidates.length)).map((t) => {
     const pos = gridToWorld(t.gx, t.gy, gridW, gridH, CELL_SIZE);
     return [pos.x + 0.7, 2.2, pos.z];
   });

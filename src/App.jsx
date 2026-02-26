@@ -17,8 +17,9 @@ import "./App.css";
 function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
   return (
     <>
-      <ambientLight intensity={0.35} color="#aaaacc" />
-      <hemisphereLight args={["#887799", "#554433", 0.4]} />
+      <ambientLight intensity={0.55} color="#bbbbdd" />
+      <hemisphereLight args={["#9988aa", "#665544", 0.6]} />
+      <directionalLight position={[0, 10, 0]} intensity={0.15} color="#aaaacc" />
 
       <Floor gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} />
       <Ceiling gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} wallHeight={dungeon.wallHeight} />
@@ -45,7 +46,7 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exi
       />
 
       <color attach="background" args={["#0a0808"]} />
-      <fog attach="fog" args={["#0a0808", 2, 20]} />
+      <fog attach="fog" args={["#0c0a08", 3, 26]} />
     </>
   );
 }
