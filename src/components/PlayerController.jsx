@@ -13,6 +13,7 @@ export default function PlayerController({
   playerPosRef,
   exploredRef,
   staminaRef,
+  cameraYawRef,
 }) {
   const { camera, gl } = useThree();
   const velocity = useRef(new THREE.Vector3());
@@ -20,6 +21,7 @@ export default function PlayerController({
   const keys = useRef({ w: false, a: false, s: false, d: false, shift: false });
   const headBob = useRef(0);
   const initialized = useRef(false);
+  const lanternRef = useRef();
 
   useEffect(() => {
     if (!initialized.current && dungeon) {
@@ -91,6 +93,8 @@ export default function PlayerController({
       staminaRef.current = Math.min(100, staminaRef.current + delta * 15);
     }
 
+    let moved = false;
+
     if (direction.current.length() > 0) {
       direction.current.normalize();
 
@@ -108,6 +112,9 @@ export default function PlayerController({
         .add(right.multiplyScalar(direction.current.x))
         .multiplyScalar(speed * delta);
 
+      const prevX = camera.position.x;
+      const prevZ = camera.position.z;
+
       const newPosX = camera.position.clone();
       newPosX.x += velocity.current.x;
       if (!checkGridCollision(newPosX, grid, gridW, gridH, cellSize)) {
@@ -120,14 +127,28 @@ export default function PlayerController({
         camera.position.z = newPosZ.z;
       }
 
-      headBob.current += delta * (sprinting ? 14 : 9);
+      moved = camera.position.x !== prevX || camera.position.z !== prevZ;
+      if (moved) {
+        headBob.current += delta * (sprinting ? 14 : 9);
+      }
     }
 
-    const bobAmount = direction.current.length() > 0 ? Math.sin(headBob.current) * 0.04 : 0;
+    const bobAmount = moved ? Math.sin(headBob.current) * 0.04 : 0;
     camera.position.y = 1.6 + bobAmount;
+
+    if (lanternRef.current) {
+      lanternRef.current.position.copy(camera.position);
+      lanternRef.current.position.y -= 0.3;
+    }
 
     if (playerPosRef) {
       playerPosRef.current = { x: camera.position.x, z: camera.position.z };
+    }
+
+    if (cameraYawRef) {
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      cameraYawRef.current = Math.atan2(dir.x, dir.z);
     }
 
     if (exploredRef) {
@@ -168,5 +189,5 @@ export default function PlayerController({
     }
   });
 
-  return null;
+  return <pointLight ref={lanternRef} color="#ffeedd" intensity={3} distance={10} decay={2} />;
 }

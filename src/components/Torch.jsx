@@ -9,7 +9,7 @@ export function TorchLight({ position }) {
   useFrame((state) => {
     const t = state.clock.elapsedTime + offsetRef.current;
     if (lightRef.current) {
-      lightRef.current.intensity = 2.5 + Math.sin(t * 8) * 0.5 + Math.sin(t * 13.7) * 0.3 + Math.sin(t * 5.3) * 0.2;
+      lightRef.current.intensity = 4 + Math.sin(t * 8) * 0.8 + Math.sin(t * 13.7) * 0.5 + Math.sin(t * 5.3) * 0.3;
     }
     if (flameRef.current) {
       flameRef.current.scale.y = 1 + Math.sin(t * 10) * 0.3;
@@ -19,7 +19,7 @@ export function TorchLight({ position }) {
 
   return (
     <group position={position}>
-      <pointLight ref={lightRef} color="#ff7733" intensity={2.5} distance={10} decay={2} />
+      <pointLight ref={lightRef} color="#ff8844" intensity={4} distance={14} decay={2} />
 
       <mesh position={[0, -0.3, 0]}>
         <cylinderGeometry args={[0.03, 0.06, 0.4, 4]} />
