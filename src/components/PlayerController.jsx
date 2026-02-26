@@ -8,6 +8,7 @@ export default function PlayerController({
   dungeon,
   onNearItem,
   items,
+  collectedItemsRef,
   onExitReach,
   exitActive,
   playerPosRef,
@@ -167,7 +168,9 @@ export default function PlayerController({
     if (onNearItem && items) {
       let closest = null;
       let minDist = Infinity;
+      const collected = collectedItemsRef ? collectedItemsRef.current : null;
       items.forEach((item) => {
+        if (collected && collected.has(item.id)) return;
         const dist = camera.position.distanceTo(
           new THREE.Vector3(item.position[0], camera.position.y, item.position[2])
         );

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
 
-export default function Minimap({ dungeon, playerPosRef, exploredRef, items, collectedItems, exitActive }) {
+export default function Minimap({ dungeon, playerPosRef, exploredRef, items, collectedItemsRef, exitActive }) {
   const canvasRef = useRef();
   const animRef = useRef();
 
@@ -38,7 +38,7 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, items, col
     const offsetZ = (gridH * cellSize) / 2;
 
     items.forEach((item) => {
-      if (collectedItems.has(item.id)) return;
+      if (collectedItemsRef.current.has(item.id)) return;
       const ix = Math.floor((item.position[0] + offsetX) / cellSize);
       const iy = Math.floor((item.position[2] + offsetZ) / cellSize);
       if (!explored.has(`${ix},${iy}`)) return;
@@ -64,7 +64,7 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, items, col
     }
 
     animRef.current = requestAnimationFrame(draw);
-  }, [dungeon, playerPosRef, exploredRef, items, collectedItems, exitActive, grid, gridW, gridH, cellSize]);
+  }, [dungeon, playerPosRef, exploredRef, items, exitActive, grid, gridW, gridH, cellSize]);
 
   useEffect(() => {
     animRef.current = requestAnimationFrame(draw);

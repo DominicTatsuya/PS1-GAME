@@ -14,7 +14,7 @@ import NearItemIndicator from "./components/UI/NearItemIndicator";
 import Minimap from "./components/UI/Minimap";
 import "./App.css";
 
-function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
+function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
   return (
     <>
       <ambientLight intensity={0.35} color="#aaaacc" />
@@ -36,6 +36,7 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exi
         dungeon={dungeon}
         onNearItem={onNearItem}
         items={items}
+        collectedItemsRef={collectedItemsRef}
         onExitReach={onExitReach}
         exitActive={exitActive}
         playerPosRef={playerPosRef}
@@ -55,6 +56,7 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [itemCount, setItemCount] = useState(0);
   const [collectedItems, setCollectedItems] = useState(new Set());
+  const collectedItemsRef = useRef(new Set());
   const [isLocked, setIsLocked] = useState(false);
   const [nearItem, setNearItem] = useState(null);
   const [cleared, setCleared] = useState(false);
@@ -94,9 +96,10 @@ export default function App() {
   }, [isLocked, cleared]);
 
   const handleItemCollect = useCallback((id) => {
+    collectedItemsRef.current.add(id);
     setScore((prev) => prev + 10);
     setItemCount((prev) => prev + 1);
-    setCollectedItems((prev) => new Set(prev).add(id));
+    setCollectedItems(new Set(collectedItemsRef.current));
   }, []);
 
   const handleExitReach = useCallback(() => {
@@ -110,6 +113,7 @@ export default function App() {
     setSeed(Date.now());
     setScore(0);
     setItemCount(0);
+    collectedItemsRef.current = new Set();
     setCollectedItems(new Set());
     setCleared(false);
     setElapsedTime(0);
@@ -150,6 +154,7 @@ export default function App() {
           onItemCollect={handleItemCollect}
           isLocked={isLocked}
           items={items}
+          collectedItemsRef={collectedItemsRef}
           onNearItem={setNearItem}
           exitActive={exitActive}
           onExitReach={handleExitReach}
@@ -181,7 +186,7 @@ export default function App() {
           playerPosRef={playerPosRef}
           exploredRef={exploredRef}
           items={items}
-          collectedItems={collectedItems}
+          collectedItemsRef={collectedItemsRef}
           exitActive={exitActive}
         />
       )}
