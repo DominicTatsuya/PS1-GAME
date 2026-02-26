@@ -1,4 +1,103 @@
-export default function GameUI({ score, itemCount, totalItems, isLocked, elapsedTime, stamina, cleared }) {
+import { useRef, useEffect, useState } from "react";
+
+function Compass({ cameraYawRef }) {
+  const ref = useRef();
+
+  useEffect(() => {
+    let raf;
+    const update = () => {
+      if (ref.current && cameraYawRef.current !== undefined) {
+        const deg = (cameraYawRef.current * 180) / Math.PI;
+        ref.current.style.transform = `rotate(${-deg}deg)`;
+      }
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+  }, [cameraYawRef]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "15px",
+        right: "15px",
+        width: "50px",
+        height: "50px",
+        zIndex: 10,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        ref={ref}
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          border: "2px solid rgba(255,170,0,0.4)",
+          borderRadius: "50%",
+          background: "rgba(0,0,0,0.6)",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "4px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontSize: "11px",
+            fontWeight: "bold",
+            color: "#ff4444",
+            lineHeight: 1,
+          }}
+        >
+          N
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: "4px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontSize: "9px",
+            color: "#888",
+            lineHeight: 1,
+          }}
+        >
+          S
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            right: "5px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: "9px",
+            color: "#888",
+            lineHeight: 1,
+          }}
+        >
+          E
+        </div>
+        <div
+          style={{
+            position: "absolute",
+            left: "5px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontSize: "9px",
+            color: "#888",
+            lineHeight: 1,
+          }}
+        >
+          W
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function GameUI({ score, itemCount, totalItems, isLocked, elapsedTime, stamina, cleared, cameraYawRef }) {
   const formatTime = (s) => {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
@@ -122,6 +221,8 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           </div>
 
+          <Compass cameraYawRef={cameraYawRef} />
+
           <div
             style={{
               position: "absolute",
@@ -172,19 +273,22 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           )}
 
+          {/* Crosshair */}
           <div
             style={{
               position: "absolute",
               top: "50%",
               left: "50%",
               transform: "translate(-50%, -50%)",
-              width: "2px",
-              height: "2px",
-              background: "rgba(255,255,255,0.6)",
-              borderRadius: "50%",
-              boxShadow: "0 0 4px rgba(255,255,255,0.3)",
+              pointerEvents: "none",
             }}
-          />
+          >
+            <div style={{ position: "absolute", top: "-8px", left: "-1px", width: "2px", height: "6px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            <div style={{ position: "absolute", bottom: "-8px", left: "-1px", width: "2px", height: "6px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            <div style={{ position: "absolute", left: "-8px", top: "-1px", width: "6px", height: "2px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            <div style={{ position: "absolute", right: "-8px", top: "-1px", width: "6px", height: "2px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            <div style={{ width: "2px", height: "2px", background: "rgba(255,255,255,0.4)", borderRadius: "50%" }} />
+          </div>
         </>
       )}
 

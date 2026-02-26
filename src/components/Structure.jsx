@@ -8,7 +8,7 @@ export default function DungeonWalls({ wallPositions, cellSize, wallHeight }) {
 
   const colorArray = useMemo(() => {
     const colors = new Float32Array(count * 3);
-    const base = new THREE.Color("#5a4a3a");
+    const base = new THREE.Color("#6e5e4e");
     for (let i = 0; i < count; i++) {
       const variation = (Math.sin(i * 13.37) * 0.5 + 0.5) * 0.08 - 0.04;
       const c = base.clone();

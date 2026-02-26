@@ -146,13 +146,13 @@ export function checkGridCollision(position, grid, gridW, gridH, cellSize, radiu
   const gx = (position.x + offsetX) / cellSize;
   const gz = (position.z + offsetZ) / cellSize;
 
-  const checkR = 2;
+  const checkR = 1;
   for (let dy = -checkR; dy <= checkR; dy++) {
     for (let dx = -checkR; dx <= checkR; dx++) {
       const cx = Math.floor(gx) + dx;
       const cz = Math.floor(gz) + dy;
 
-      if (cx < 0 || cx >= gridW || cz < 0 || cz >= gridH) return true;
+      if (cx < 0 || cx >= gridW || cz < 0 || cz >= gridH) continue;
       if (grid[cz][cx] !== 1) continue;
 
       const wallMinX = cx * cellSize - offsetX;

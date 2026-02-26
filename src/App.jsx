@@ -14,11 +14,11 @@ import NearItemIndicator from "./components/UI/NearItemIndicator";
 import Minimap from "./components/UI/Minimap";
 import "./App.css";
 
-function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef }) {
+function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
   return (
     <>
-      <ambientLight intensity={0.08} color="#332244" />
-      <hemisphereLight args={["#1a1520", "#0a0806", 0.15]} />
+      <ambientLight intensity={0.35} color="#aaaacc" />
+      <hemisphereLight args={["#887799", "#554433", 0.4]} />
 
       <Floor gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} />
       <Ceiling gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} wallHeight={dungeon.wallHeight} />
@@ -41,10 +41,11 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, onNearItem, exi
         playerPosRef={playerPosRef}
         exploredRef={exploredRef}
         staminaRef={staminaRef}
+        cameraYawRef={cameraYawRef}
       />
 
-      <color attach="background" args={["#050404"]} />
-      <fog attach="fog" args={["#050404", 1, 14]} />
+      <color attach="background" args={["#0a0808"]} />
+      <fog attach="fog" args={["#0a0808", 2, 20]} />
     </>
   );
 }
@@ -63,6 +64,7 @@ export default function App() {
   const playerPosRef = useRef({ x: 0, z: 0 });
   const exploredRef = useRef(new Set());
   const staminaRef = useRef(100);
+  const cameraYawRef = useRef(0);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
   const controlsRef = useRef();
@@ -132,11 +134,17 @@ export default function App() {
   return (
     <div className="game-container">
       <Canvas
-        camera={{ position: [dungeon.startPos.x, dungeon.startPos.y, dungeon.startPos.z], fov: 80, near: 0.1, far: 30 }}
+        camera={{ position: [dungeon.startPos.x, dungeon.startPos.y, dungeon.startPos.z], fov: 75, near: 0.1, far: 40 }}
         gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
-        dpr={0.6}
+        dpr={0.65}
       >
-        <PointerLockControls ref={controlsRef} onLock={handleLock} onUnlock={handleUnlock} />
+        <PointerLockControls
+          ref={controlsRef}
+          onLock={handleLock}
+          onUnlock={handleUnlock}
+          minPolarAngle={Math.PI * 0.2}
+          maxPolarAngle={Math.PI * 0.8}
+        />
         <DungeonScene
           dungeon={dungeon}
           onItemCollect={handleItemCollect}
@@ -148,6 +156,7 @@ export default function App() {
           playerPosRef={playerPosRef}
           exploredRef={exploredRef}
           staminaRef={staminaRef}
+          cameraYawRef={cameraYawRef}
         />
       </Canvas>
 
@@ -161,6 +170,7 @@ export default function App() {
         elapsedTime={elapsedTime}
         stamina={stamina}
         cleared={cleared}
+        cameraYawRef={cameraYawRef}
       />
 
       {isLocked && !cleared && <NearItemIndicator nearItem={nearItem} />}
