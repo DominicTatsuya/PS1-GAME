@@ -1,0 +1,32 @@
+export const MAZE = {
+  WIDTH: 10,
+  HEIGHT: 10,
+  CELL_SIZE: 2.0,
+  WALL_HEIGHT: 3.5,
+};
+
+export const PLAYER = {
+  HEIGHT: 1.6,
+  COLLISION_RADIUS: 0.35,
+  SPEED: 4.5,
+  SPRINT_SPEED: 7.5,
+  STAMINA_MAX: 100,
+  STAMINA_DRAIN: 25,
+  STAMINA_REGEN: 15,
+};
+
+export const ITEMS = {
+  COUNT: 5,
+  COLLECT_DISTANCE: 2.5,
+  SCORE_PER_ITEM: 10,
+};
+
+export const SCORING = {
+  CLEAR_BONUS: 50,
+  TIME_BONUS_BASE: 300,
+};
+
+export const TORCH = {
+  MAX_COUNT: 30,
+  CORRIDOR_CHANCE: 0.3,
+};

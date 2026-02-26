@@ -192,5 +192,5 @@ export default function PlayerController({
     }
   });
 
-  return <pointLight ref={lanternRef} color="#ffeedd" intensity={4.5} distance={14} decay={2} />;
+  return <pointLight ref={lanternRef} color="#ffeedd" intensity={6} distance={20} decay={1} />;
 }

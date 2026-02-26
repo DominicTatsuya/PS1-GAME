@@ -75,13 +75,20 @@ PS1-GAME/
 │   └── vite.svg
 ├── src/
 │   ├── App.jsx                     # メインアプリ（Canvas構成・ゲームステート管理）
-│   ├── App.css                     # CRTスキャンライン・ビネット・ピクセル化
 │   ├── main.jsx                    # エントリーポイント
-│   ├── index.css                   # グローバルスタイル
+│   ├── styles/
+│   │   ├── App.css                 # CRTスキャンライン・ビネット・ピクセル化
+│   │   └── index.css               # グローバルスタイル
+│   ├── data/
+│   │   └── config.js               # ゲーム定数（迷路・プレイヤー・スコア・松明設定）
+│   ├── shaders/                    # シェーダー実装用（将来拡張）
+│   ├── systems/
+│   │   ├── MapGenerator.js         # 迷路生成・BFS・衝突判定・座標変換
+│   │   └── TextureGenerator.js     # 手続きテクスチャ生成（石壁・石畳・天井）
 │   ├── components/
 │   │   ├── PlayerController.jsx    # プレイヤー移動・ランタン・コンパス・探索追跡
 │   │   ├── CollectibleItem.jsx     # 収集アイテム（発光・パルス・Eキー収集）
-│   │   ├── Structure.jsx           # InstancedMesh壁描画・石壁テクスチャ生成
+│   │   ├── Structure.jsx           # InstancedMesh壁描画
 │   │   ├── Floor.jsx               # 石畳テクスチャ床
 │   │   ├── Ceiling.jsx             # 岩肌テクスチャ天井
 │   │   ├── Torch.jsx               # 松明（揺らぎライト・炎メッシュ）
@@ -89,11 +96,11 @@ PS1-GAME/
 │   │   └── UI/
 │   │       ├── GameUI.jsx          # HUD・スタート画面・クリア画面・コンパス
 │   │       ├── NearItemIndicator.jsx # アイテム接近プロンプト
-│   │       └── Minimap.jsx         # ミニマップ（霧の戦場・リアルタイム描画）
-│   └── systems/
-│       └── MapGenerator.js         # 迷路生成・BFS・衝突判定・座標変換
+│   │       └── Minimap.jsx         # ミニマップ（霧の戦場・Mキー拡大・方向矢印）
+│   └── assets/
+│       └── react.svg
 ├── index.html
-├── vite.config.js
+├── vite.config.js                  # Vite設定（チャンクサイズ警告閾値含む）
 ├── eslint.config.js
 ├── tsconfig.json
 ├── package.json

@@ -12,14 +12,14 @@ import ExitPortal from "./components/Goal";
 import GameUI from "./components/UI/GameUI";
 import NearItemIndicator from "./components/UI/NearItemIndicator";
 import Minimap from "./components/UI/Minimap";
-import "./App.css";
+import "./styles/App.css";
 
 function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
   return (
     <>
-      <ambientLight intensity={0.55} color="#bbbbdd" />
-      <hemisphereLight args={["#9988aa", "#665544", 0.6]} />
-      <directionalLight position={[0, 10, 0]} intensity={0.15} color="#aaaacc" />
+      <ambientLight intensity={0.8} color="#ccccee" />
+      <hemisphereLight args={["#aa99bb", "#776655", 0.7]} />
+      <directionalLight position={[0, 10, 0]} intensity={0.25} color="#bbbbdd" />
 
       <Floor gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} />
       <Ceiling gridW={dungeon.gridW} gridH={dungeon.gridH} cellSize={dungeon.cellSize} wallHeight={dungeon.wallHeight} />
@@ -46,8 +46,8 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsR
         cameraYawRef={cameraYawRef}
       />
 
-      <color attach="background" args={["#0a0808"]} />
-      <fog attach="fog" args={["#0c0a08", 3, 26]} />
+      <color attach="background" args={["#141210"]} />
+      <fog attach="fog" args={["#141210", 8, 32]} />
     </>
   );
 }
