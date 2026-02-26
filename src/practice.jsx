@@ -159,20 +159,34 @@ function CollectibleItem({ position, onCollect,id}){
 }
 
 
-function PlayerController ({isLocked, onNearItem,items )}{
+function PlayerController ({isLocked, onNearItem, items }) {
     //ここで現在のシーンのカメラの情報を取得して、プレイヤー位置を算出するための情報として取得している
-    const { camera} = useThree();
-    // velosityはなんのために使われているのかよくわからない。
-    const velocity = useRef(new.THREE.Vector3());
-    const diretion = useRef(new THREE.Vector3());
-    const keys = useRef({ w: false,a:false,s:false,d:false });
+    const { camera } = useThree();
+    // velocityは移動の慣性計算などに使われる
+    const velocity = useRef(new THREE.Vector3());
+    const direction = useRef(new THREE.Vector3());
+    const keys = useRef({ w: false, a: false, s: false, d: false });
 
     useEffect(() => {
-      const handleKeyDown = (e) => {
-        const key = e.key.toLowerCase();
-        if(key in keys.current) {
-            keys.current[key] = true;
-        }
-      }
-      
-    })
+        const handleKeyDown = (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys.current) {
+                keys.current[key] = true;
+            }
+        };
+        const handleKeyUp = (e) => {
+            const key = e.key.toLowerCase();
+            if (key in keys.current) {
+                keys.current[key] = false;
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("keyup", handleKeyUp);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("keyup", handleKeyUp);
+        };
+    }, []);
+
+    return null;
+}

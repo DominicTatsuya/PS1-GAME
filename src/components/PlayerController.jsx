@@ -14,7 +14,7 @@ export default function PlayerController({
   exploredRef,
   staminaRef,
 }) {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
   const keys = useRef({ w: false, a: false, s: false, d: false, shift: false });
@@ -28,25 +28,48 @@ export default function PlayerController({
     }
   }, [dungeon, camera]);
 
+  const codeToKey = {
+    KeyW: "w",
+    KeyA: "a",
+    KeyS: "s",
+    KeyD: "d",
+    ShiftLeft: "shift",
+    ShiftRight: "shift",
+  };
+
   useEffect(() => {
+    const canvas = gl.domElement;
+    canvas.tabIndex = 0;
+    canvas.setAttribute("tabindex", "0");
+
     const handleKeyDown = (e) => {
-      const key = e.key.toLowerCase();
-      if (key in keys.current) keys.current[key] = true;
-      if (e.key === "Shift") keys.current.shift = true;
+      const key = codeToKey[e.code];
+      if (key) {
+        keys.current[key] = true;
+        e.preventDefault();
+      }
     };
     const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase();
-      if (key in keys.current) keys.current[key] = false;
-      if (e.key === "Shift") keys.current.shift = false;
+      const key = codeToKey[e.code];
+      if (key) {
+        keys.current[key] = false;
+        e.preventDefault();
+      }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("keyup", handleKeyUp, true);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("keyup", handleKeyUp, true);
     };
-  }, []);
+  }, [gl]);
+
+  useEffect(() => {
+    if (isLocked && gl.domElement) {
+      gl.domElement.focus();
+    }
+  }, [isLocked, gl]);
 
   useFrame((state, delta) => {
     if (!isLocked || !dungeon) return;
