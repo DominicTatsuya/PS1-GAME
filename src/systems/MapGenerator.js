@@ -453,25 +453,54 @@ export function generateDungeon(seed = Date.now()) {
       if (grid[y + 1][x] === 0) open++;
       if (grid[y][x - 1] === 0) open++;
       if (grid[y][x + 1] === 0) open++;
-      if (open === 2) corridorCells.push({ gx: x, gy: y }); // 直線通路
+      if (open === 2) corridorCells.push({ gx: x, gy: y });
     }
   }
 
   const rng3 = mulberry32(seed + 77);
 
-  // たいまつ候補: 分岐点 + 行き止まり + 通路の一部（30% の確率で選出）
   const torchCandidates = [
     ...junctions,
     ...deadEnds,
     ...corridorCells.filter(() => rng3() < 0.3),
   ];
-  torchCandidates.sort(() => 0.5 - rng3()); // シャッフル
+  torchCandidates.sort(() => 0.5 - rng3());
 
-  // 最大 30 本を選び、ワールド座標に変換
-  // [x+0.7, 2.2, z]: 壁際に寄せて (x+0.7)、高さ 2.2m の位置に配置
-  const torches = torchCandidates.slice(0, Math.min(30, torchCandidates.length)).map((t) => {
+  // 隣接する松明を除外するため、グリッド距離3以上の間隔を確保
+  const placedTorchGrids = [];
+  const filteredCandidates = [];
+  for (const t of torchCandidates) {
+    const tooClose = placedTorchGrids.some(
+      (p) => Math.abs(p.gx - t.gx) + Math.abs(p.gy - t.gy) <= 4
+    );
+    if (!tooClose) {
+      filteredCandidates.push(t);
+      placedTorchGrids.push(t);
+    }
+  }
+
+  // 各松明について隣接する壁の方向を検出し、壁面に配置
+  // wallDir: 松明が取り付けられる壁の方向（松明は壁から通路側に突き出す）
+  const torches = filteredCandidates.slice(0, Math.min(25, filteredCandidates.length)).map((t) => {
     const pos = gridToWorld(t.gx, t.gy, gridW, gridH, CELL_SIZE);
-    return [pos.x + 0.7, 2.2, pos.z];
+
+    // 隣接セルのうち壁であるものを探す（松明を取り付ける壁面）
+    const wallDirs = [];
+    if (grid[t.gy - 1] && grid[t.gy - 1][t.gx] === 1) wallDirs.push({ dx: 0, dz: -1, angle: 0 });
+    if (grid[t.gy + 1] && grid[t.gy + 1][t.gx] === 1) wallDirs.push({ dx: 0, dz: 1, angle: Math.PI });
+    if (grid[t.gy][t.gx - 1] === 1) wallDirs.push({ dx: -1, dz: 0, angle: Math.PI / 2 });
+    if (grid[t.gy][t.gx + 1] === 1) wallDirs.push({ dx: 1, dz: 0, angle: -Math.PI / 2 });
+
+    // 壁が見つかった場合、最初の壁面に取り付け
+    // 見つからない場合（中央通路など）はデフォルト方向
+    const dir = wallDirs.length > 0 ? wallDirs[Math.floor(rng3() * wallDirs.length)] : { dx: 0, dz: -1, angle: 0 };
+
+    // 壁面に密着するよう、壁方向にセルサイズの半分だけオフセット
+    const wallOffset = CELL_SIZE * 0.45;
+    return {
+      position: [pos.x + dir.dx * wallOffset, 2.0, pos.z + dir.dz * wallOffset],
+      angle: dir.angle,
+    };
   });
 
   // ─── 壁のワールド座標リストを生成 ───
