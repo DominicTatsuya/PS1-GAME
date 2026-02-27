@@ -110,7 +110,7 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsR
           items 配列を map で展開し、各アイテムを3Dオブジェクトとして配置。
           key={item.id} は React がリスト要素を効率的に管理するために必要 */}
       {items.map((item) => (
-        <CollectibleItem key={item.id} position={item.position} id={item.id} onCollect={onItemCollect} />
+        <CollectibleItem key={`${dungeon.seed}_${item.id}`} position={item.position} id={item.id} onCollect={onItemCollect} />
       ))}
 
       {/* 脱出ポータル（ゴール）。active=true のとき視覚的に有効化される */}
@@ -167,10 +167,8 @@ export default function App() {
   // 収集アイテム数
   const [itemCount, setItemCount] = useState(0);
 
-  // 収集済みアイテムIDの Set（UIの再描画用にstateとしても保持）
-  const [collectedItems, setCollectedItems] = useState(new Set());
-
-  // 収集済みアイテムIDの Set（ref版: リアルタイム参照用、再レンダリングなし）
+  // 収集済みアイテムIDの Set（ref: リアルタイム参照用、値が変わっても再レンダリングしない）
+  // useState ではなく useRef を使うことで、アイテム取得時にシーン全体の再描画を防ぐ
   const collectedItemsRef = useRef(new Set());
 
   // ポインターロック状態（true = ゲームプレイ中、false = メニュー/一時停止）
@@ -270,7 +268,6 @@ export default function App() {
     collectedItemsRef.current.add(id);
     setScore((prev) => prev + 10);
     setItemCount((prev) => prev + 1);
-    setCollectedItems(new Set(collectedItemsRef.current));
   }, []);
 
   /**
@@ -293,7 +290,6 @@ export default function App() {
     setScore(0);
     setItemCount(0);
     collectedItemsRef.current = new Set();
-    setCollectedItems(new Set());
     setCleared(false);
     setElapsedTime(0);
     setStamina(100);
