@@ -1,22 +1,62 @@
+/**
+ * GameUI.jsx - ゲームのHUD（ヘッドアップディスプレイ）
+ *
+ * 3Dシーンの上に重ねて表示されるHTML UIコンポーネント。
+ * ゲームの各状態に応じて異なる画面を表示する:
+ *
+ * 1. スタート画面（未ロック時）: タイトル、操作説明、開始プロンプト
+ * 2. プレイ中HUD（ロック中）: スコア、アイテム数、タイマー、スタミナバー、コンパス、照準
+ * 3. クリア画面（ゲームクリア時）: 結果表示、スコア計算、再挑戦プロンプト
+ *
+ * 技術ポイント:
+ * - pointerEvents: "none" で3Dシーンへのクリックを透過
+ * - requestAnimationFrame でコンパスの回転をリアルタイム更新
+ * - CSSインラインスタイルでレトロなUI演出
+ */
+
 import { useRef, useEffect, useState } from "react";
 
+/**
+ * Compass コンポーネント（内部コンポーネント）
+ *
+ * カメラのヨー角（水平回転角度）に応じて回転するコンパスUI。
+ * N（北）/ S（南）/ E（東）/ W（西）の文字が表示され、
+ * プレイヤーの向きに合わせてリアルタイムに回転する。
+ *
+ * requestAnimationFrame を使用してReactの再レンダリングなしに
+ * CSSのtransformを直接操作することで、高パフォーマンスな回転を実現。
+ *
+ * @param {Object} cameraYawRef - カメラのヨー角（ラジアン）を保持するref
+ */
 function Compass({ cameraYawRef }) {
+  // コンパスのDOM要素への参照（style.transform を直接操作するため）
   const ref = useRef();
 
   useEffect(() => {
     let raf;
+
+    // 毎フレーム実行される更新関数
     const update = () => {
       if (ref.current && cameraYawRef.current !== undefined) {
+        // ラジアンを度数法に変換（CSS の rotate() は度数法を使用）
         const deg = (cameraYawRef.current * 180) / Math.PI;
+        // マイナスを付けることでカメラの回転と逆方向にコンパスを回転
+        // → プレイヤーが右を向くと、コンパスのNが左に回る（実際のコンパスと同じ動き）
         ref.current.style.transform = `rotate(${-deg}deg)`;
       }
+      // 次のフレームで再度 update を呼び出す
       raf = requestAnimationFrame(update);
     };
+
+    // アニメーションループを開始
     raf = requestAnimationFrame(update);
+
+    // クリーンアップ: コンポーネント破棄時にアニメーションを停止
     return () => cancelAnimationFrame(raf);
   }, [cameraYawRef]);
 
   return (
+    // コンパスの外枠（右上に固定配置）
     <div
       style={{
         position: "absolute",
@@ -28,6 +68,8 @@ function Compass({ cameraYawRef }) {
         pointerEvents: "none",
       }}
     >
+      {/* 回転する内部要素（N/S/E/Wの文字を含む円）
+          ref を付与して style.transform を直接操作する */}
       <div
         ref={ref}
         style={{
@@ -39,6 +81,7 @@ function Compass({ cameraYawRef }) {
           background: "rgba(0,0,0,0.6)",
         }}
       >
+        {/* 北（North）: 赤色で目立つように */}
         <div
           style={{
             position: "absolute",
@@ -53,6 +96,7 @@ function Compass({ cameraYawRef }) {
         >
           N
         </div>
+        {/* 南（South） */}
         <div
           style={{
             position: "absolute",
@@ -66,6 +110,7 @@ function Compass({ cameraYawRef }) {
         >
           S
         </div>
+        {/* 東（East） */}
         <div
           style={{
             position: "absolute",
@@ -79,6 +124,7 @@ function Compass({ cameraYawRef }) {
         >
           E
         </div>
+        {/* 西（West） */}
         <div
           style={{
             position: "absolute",
@@ -97,17 +143,42 @@ function Compass({ cameraYawRef }) {
   );
 }
 
+/**
+ * GameUI コンポーネント（メインUIコンポーネント）
+ *
+ * ゲームの全状態に対応するUI表示を行う。
+ *
+ * @param {number} score - 現在のスコア（アイテム1つ=10点）
+ * @param {number} itemCount - 収集済みアイテム数
+ * @param {number} totalItems - アイテム総数
+ * @param {boolean} isLocked - ポインターロック状態（ゲームプレイ中かどうか）
+ * @param {number} elapsedTime - 経過時間（秒）
+ * @param {number} stamina - 現在のスタミナ（0～100）
+ * @param {boolean} cleared - クリア状態
+ * @param {Object} cameraYawRef - カメラのヨー角のref（コンパスに渡す）
+ */
 export default function GameUI({ score, itemCount, totalItems, isLocked, elapsedTime, stamina, cleared, cameraYawRef }) {
+  /**
+   * 時間を "MM:SS" 形式にフォーマットする関数
+   * @param {number} s - 秒数
+   * @returns {string} "MM:SS" 形式の文字列（例: "02:35"）
+   */
   const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
+    const m = Math.floor(s / 60);          // 分を計算
+    const sec = Math.floor(s % 60);        // 秒を計算（余り）
+    // padStart(2, "0") で1桁の場合に先頭に0を付ける（例: 5 → "05"）
     return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
+  // ===== スコア計算 =====
+  // タイムボーナス: 300秒以内にクリアすると残り秒数がボーナスに（最低0点）
   const timeBonus = Math.max(0, 300 - Math.floor(elapsedTime));
+  // 最終スコア: 基本スコア + （クリア時のみ）タイムボーナス + クリアボーナス50点
   const finalScore = score + (cleared ? timeBonus + 50 : 0);
 
   return (
+    // UI全体のコンテナ。画面全体に広がり、3Dシーンの上に重なる。
+    // pointerEvents: "none" でマウスクリックを透過（3Dシーンへの操作を妨げない）
     <div
       style={{
         position: "absolute",
@@ -121,6 +192,9 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
         textShadow: "1px 1px 2px #000, 0 0 8px rgba(0,0,0,0.5)",
       }}
     >
+      {/* ========== スタート画面 ==========
+          未ロック（マウスカーソル未ロック）かつ未クリア時に表示。
+          タイトル、操作説明、ゲーム開始プロンプトを含む。 */}
       {!isLocked && !cleared && (
         <div
           style={{
@@ -137,6 +211,7 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             maxWidth: "420px",
           }}
         >
+          {/* ゲームタイトル */}
           <h1
             style={{
               margin: "0 0 8px 0",
@@ -148,10 +223,12 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
           >
             DUNGEON
           </h1>
+          {/* サブタイトル */}
           <p style={{ margin: "0 0 20px 0", fontSize: "12px", color: "#887755", letterSpacing: "6px" }}>
             PS1 EXPLORATION
           </p>
 
+          {/* ===== 操作説明セクション ===== */}
           <div
             style={{
               margin: "20px 0",
@@ -161,6 +238,7 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
               border: "1px solid rgba(255,170,0,0.2)",
             }}
           >
+            {/* 各操作キーの説明 */}
             <div style={controlStyle}>
               <span style={keyStyle}>W/A/S/D</span> 移動
             </div>
@@ -178,20 +256,27 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           </div>
 
+          {/* ミッション説明 */}
           <p style={{ margin: "15px 0 5px", fontSize: "13px", color: "#ffaa00" }}>
             ダンジョン内のアイテムを全て集め
           </p>
           <p style={{ margin: "0 0 15px", fontSize: "13px", color: "#ffaa00" }}>
             出口を見つけて脱出せよ
           </p>
+
+          {/* ゲーム開始プロンプト */}
           <p style={{ margin: "10px 0 0", fontSize: "16px", color: "#fff", opacity: 0.7, letterSpacing: "2px" }}>
             ▶ クリックして開始
           </p>
         </div>
       )}
 
+      {/* ========== プレイ中HUD ==========
+          ポインターロック中かつ未クリア時に表示。
+          スコア、アイテム数、タイマー、スタミナバー、コンパス、照準を含む。 */}
       {isLocked && !cleared && (
         <>
+          {/* ===== スコア・アイテム・タイマー表示（左上） ===== */}
           <div
             style={{
               position: "absolute",
@@ -206,23 +291,30 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
               minWidth: "140px",
             }}
           >
+            {/* スコア表示 */}
             <div style={{ color: "#ffaa00", fontWeight: "bold", fontSize: "13px" }}>
               SCORE <span style={{ color: "#fff", marginLeft: "8px" }}>{score}</span>
             </div>
+            {/* アイテム数: 全部集めると緑色に変化 */}
             <div style={{ fontSize: "12px", marginTop: "4px" }}>
               <span style={{ color: "#888" }}>ITEMS</span>{" "}
               <span style={{ color: itemCount === totalItems ? "#00ff88" : "#ffcc00" }}>
                 {itemCount}/{totalItems}
               </span>
             </div>
+            {/* 経過時間: formatTime で "MM:SS" 形式に変換して表示 */}
             <div style={{ fontSize: "12px", marginTop: "4px" }}>
               <span style={{ color: "#888" }}>TIME</span>{" "}
               <span style={{ color: "#ccc" }}>{formatTime(elapsedTime)}</span>
             </div>
           </div>
 
+          {/* ===== コンパス（右上）===== */}
           <Compass cameraYawRef={cameraYawRef} />
 
+          {/* ===== スタミナバー（左下） =====
+              ダッシュ（Shift）で消費、停止時に回復するスタミナをバーで表示。
+              残量に応じて色が変化: 青(31%以上) → 黄(11-30%) → 赤(10%以下) */}
           <div
             style={{
               position: "absolute",
@@ -232,6 +324,7 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             }}
           >
             <div style={{ fontSize: "10px", color: "#888", marginBottom: "3px" }}>STAMINA</div>
+            {/* バーの外枠 */}
             <div
               style={{
                 width: "100%",
@@ -242,10 +335,12 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
                 overflow: "hidden",
               }}
             >
+              {/* バーの中身（width を stamina% で動的に変化） */}
               <div
                 style={{
                   width: `${stamina}%`,
                   height: "100%",
+                  // 三項演算子でスタミナ量に応じて色を分岐
                   background: stamina > 30 ? "#44aaff" : stamina > 10 ? "#ffaa00" : "#ff4444",
                   transition: "width 0.1s",
                   borderRadius: "2px",
@@ -254,6 +349,8 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           </div>
 
+          {/* ===== 出口誘導メッセージ =====
+              全アイテム収集後に表示される。CSSアニメーション(pulse)で点滅する。 */}
           {itemCount === totalItems && (
             <div
               style={{
@@ -273,7 +370,9 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           )}
 
-          {/* Crosshair */}
+          {/* ===== 照準（クロスヘア）=====
+              画面中央に十字の照準を表示。FPSゲームの標準的なUI要素。
+              上下左右の4本の線と中央のドットで構成される。 */}
           <div
             style={{
               position: "absolute",
@@ -283,15 +382,22 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
               pointerEvents: "none",
             }}
           >
+            {/* 上の線 */}
             <div style={{ position: "absolute", top: "-8px", left: "-1px", width: "2px", height: "6px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            {/* 下の線 */}
             <div style={{ position: "absolute", bottom: "-8px", left: "-1px", width: "2px", height: "6px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            {/* 左の線 */}
             <div style={{ position: "absolute", left: "-8px", top: "-1px", width: "6px", height: "2px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            {/* 右の線 */}
             <div style={{ position: "absolute", right: "-8px", top: "-1px", width: "6px", height: "2px", background: "rgba(255,255,255,0.6)", boxShadow: "0 0 2px rgba(0,0,0,0.8)" }} />
+            {/* 中央のドット */}
             <div style={{ width: "2px", height: "2px", background: "rgba(255,255,255,0.4)", borderRadius: "50%" }} />
           </div>
         </>
       )}
 
+      {/* ========== クリア画面 ==========
+          ゲームクリア時に表示。結果とスコア内訳を表示する。 */}
       {cleared && (
         <div
           style={{
@@ -307,6 +413,7 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             boxShadow: "0 0 40px rgba(0,255,136,0.2)",
           }}
         >
+          {/* クリアタイトル */}
           <h2
             style={{
               margin: "0 0 20px 0",
@@ -318,23 +425,31 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
           >
             DUNGEON CLEAR
           </h2>
+
+          {/* ===== スコア内訳 ===== */}
           <div style={{ margin: "20px 0", fontSize: "14px", lineHeight: "2", color: "#aaa" }}>
+            {/* クリアタイム */}
             <div>
               TIME <span style={{ color: "#fff", marginLeft: "10px" }}>{formatTime(elapsedTime)}</span>
             </div>
+            {/* 収集アイテム数 */}
             <div>
               ITEMS{" "}
               <span style={{ color: "#ffcc00", marginLeft: "10px" }}>
                 {itemCount}/{totalItems}
               </span>
             </div>
+            {/* タイムボーナス: 300秒からの残り秒数 */}
             <div>
               TIME BONUS <span style={{ color: "#44aaff", marginLeft: "10px" }}>{timeBonus}</span>
             </div>
+            {/* クリアボーナス: 固定50点 */}
             <div>
               CLEAR BONUS <span style={{ color: "#44aaff", marginLeft: "10px" }}>50</span>
             </div>
           </div>
+
+          {/* 最終スコア合計 */}
           <div
             style={{
               margin: "20px 0 10px",
@@ -345,6 +460,8 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
           >
             TOTAL {finalScore}
           </div>
+
+          {/* 再挑戦プロンプト（クリックするとhandleLock → handleRestart が実行される） */}
           <p style={{ margin: "20px 0 0", fontSize: "13px", color: "#666", letterSpacing: "1px" }}>
             クリックして再挑戦
           </p>
@@ -354,12 +471,17 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
   );
 }
 
+// ===== 操作説明用の共通スタイルオブジェクト =====
+// コンポーネント外に定義することで、レンダリング毎にオブジェクトが再生成されるのを防ぐ
+
+/** 操作説明の各行のスタイル */
 const controlStyle = {
   margin: "6px 0",
   fontSize: "12px",
   color: "#bba880",
 };
 
+/** キー名（W/A/S/D等）のスタイル。右寄せで統一された幅に */
 const keyStyle = {
   display: "inline-block",
   minWidth: "70px",

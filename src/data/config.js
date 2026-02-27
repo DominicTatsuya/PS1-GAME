@@ -1,32 +1,93 @@
+/**
+ * ============================================================
+ * config.js — ゲーム全体の定数（設定値）をまとめたファイル
+ * ============================================================
+ *
+ * ゲーム内で使われる数値パラメータを一箇所に集約しています。
+ * ここを変更するだけでゲームバランスの調整ができます。
+ *
+ * なぜ定数をまとめるのか？
+ *   - マジックナンバー（コード中に直接書かれた数値）を避けられる
+ *   - バランス調整時に 1 ファイルだけ変更すれば済む
+ *   - 定数の意味がコード中で明確になる
+ *
+ * 各セクション:
+ *   MAZE    — 迷路の構造に関する定数
+ *   PLAYER  — プレイヤーの動作に関する定数
+ *   ITEMS   — 収集アイテムに関する定数
+ *   SCORING — スコア計算に関する定数
+ *   TORCH   — たいまつ（照明）に関する定数
+ * ============================================================
+ */
+
+/**
+ * MAZE — 迷路の構造パラメータ
+ *
+ * WIDTH / HEIGHT: 迷路のセル数（10×10 = 100 セル）
+ * CELL_SIZE: 1 セルの 3D 空間での大きさ（2.0 メートル相当）
+ * WALL_HEIGHT: 壁の高さ（3.5 メートル相当）
+ */
 export const MAZE = {
-  WIDTH: 10,
-  HEIGHT: 10,
-  CELL_SIZE: 2.0,
-  WALL_HEIGHT: 3.5,
+  WIDTH: 10,          // 迷路の横幅（セル数）
+  HEIGHT: 10,         // 迷路の縦幅（セル数）
+  CELL_SIZE: 2.0,     // 1 セルのサイズ（メートル相当）
+  WALL_HEIGHT: 3.5,   // 壁の高さ（メートル相当）
 };
 
+/**
+ * PLAYER — プレイヤー（一人称視点）のパラメータ
+ *
+ * HEIGHT: カメラ（目線）の高さ（メートル相当）
+ * COLLISION_RADIUS: 衝突判定の半径（メートル相当）。壁にこれ以上近づけない
+ * SPEED: 通常歩行の移動速度（メートル/秒）
+ * SPRINT_SPEED: ダッシュ時の移動速度（メートル/秒）
+ * STAMINA_MAX: スタミナの最大値（パーセント、100 = フル）
+ * STAMINA_DRAIN: ダッシュ中のスタミナ消費速度（ポイント/秒）
+ * STAMINA_REGEN: 歩行・停止中のスタミナ回復速度（ポイント/秒）
+ */
 export const PLAYER = {
-  HEIGHT: 1.6,
-  COLLISION_RADIUS: 0.35,
-  SPEED: 4.5,
-  SPRINT_SPEED: 7.5,
-  STAMINA_MAX: 100,
-  STAMINA_DRAIN: 25,
-  STAMINA_REGEN: 15,
+  HEIGHT: 1.6,            // プレイヤーの目の高さ（メートル相当）
+  COLLISION_RADIUS: 0.35, // 衝突判定の半径（メートル相当）
+  SPEED: 4.5,             // 通常移動速度（メートル/秒）
+  SPRINT_SPEED: 7.5,      // ダッシュ速度（メートル/秒）
+  STAMINA_MAX: 100,       // スタミナ最大値
+  STAMINA_DRAIN: 25,      // スタミナ消費速度（/秒）
+  STAMINA_REGEN: 15,      // スタミナ回復速度（/秒）
 };
 
+/**
+ * ITEMS — 収集アイテムのパラメータ
+ *
+ * COUNT: ダンジョン内に配置されるアイテムの数
+ * COLLECT_DISTANCE: アイテムを拾える距離（メートル相当）
+ * SCORE_PER_ITEM: 1 個拾うごとに加算されるスコア
+ */
 export const ITEMS = {
-  COUNT: 5,
-  COLLECT_DISTANCE: 2.5,
-  SCORE_PER_ITEM: 10,
+  COUNT: 5,              // アイテムの総数
+  COLLECT_DISTANCE: 2.5, // アイテム取得可能距離（メートル相当）
+  SCORE_PER_ITEM: 10,    // 1 個あたりのスコア（ポイント）
 };
 
+/**
+ * SCORING — スコア計算のパラメータ
+ *
+ * CLEAR_BONUS: ダンジョンクリア時のボーナススコア
+ * TIME_BONUS_BASE: 時間ボーナスの基準秒数。
+ *   この秒数以内にクリアするとボーナスが加算される（早いほど高得点）
+ */
 export const SCORING = {
-  CLEAR_BONUS: 50,
-  TIME_BONUS_BASE: 300,
+  CLEAR_BONUS: 50,       // クリアボーナス（ポイント）
+  TIME_BONUS_BASE: 300,  // 時間ボーナスの基準（秒）
 };
 
+/**
+ * TORCH — たいまつ（照明）のパラメータ
+ *
+ * MAX_COUNT: ダンジョン内に配置するたいまつの最大本数
+ * CORRIDOR_CHANCE: 直線通路にたいまつを配置する確率（0.0〜1.0）
+ *   0.3 = 30% の確率で配置される
+ */
 export const TORCH = {
-  MAX_COUNT: 30,
-  CORRIDOR_CHANCE: 0.3,
+  MAX_COUNT: 30,         // たいまつの最大配置数
+  CORRIDOR_CHANCE: 0.3,  // 通路へのたいまつ配置確率（30%）
 };
