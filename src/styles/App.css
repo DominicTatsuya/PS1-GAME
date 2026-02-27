@@ -1,3 +1,21 @@
+/**
+ * App.css - PS1風CRTエフェクトのスタイルシート
+ *
+ * PlayStation 1 時代のブラウン管テレビ（CRT）を再現するCSSエフェクト:
+ *
+ * 1. game-container: ゲーム全体を包むフルスクリーンコンテナ
+ * 2. canvas のピクセル化: 低解像度テクスチャをドット絵風に表示
+ * 3. scanlines: CRTの水平走査線（横縞）を再現するオーバーレイ
+ * 4. vignette: 画面の四隅が暗くなるビネットエフェクト
+ * 5. pulse アニメーション: UIテキストの点滅アニメーション
+ *
+ * これらのエフェクトは純粋なCSSで実装されており、
+ * GPU負荷を最小限に抑えつつレトロな雰囲気を演出する。
+ */
+
+/* ===== ゲームコンテナ =====
+   画面全体を覆うコンテナ。100vw x 100vh でビューポート全体を使用。
+   overflow: hidden ではみ出した要素を非表示にする。 */
 .game-container {
   width: 100vw;
   height: 100vh;
@@ -6,12 +24,26 @@
   overflow: hidden;
 }
 
+/* ===== Canvas のピクセル化 =====
+   Three.js の Canvas 要素に適用。dpr=0.65 で低解像度にレンダリングされた
+   3Dシーンを拡大表示する際、ぼやけずにドット絵のようにくっきり表示する。
+   各ブラウザ向けに3つのプロパティを指定（フォールバック対応）。 */
 .game-container canvas {
-  image-rendering: pixelated !important;
-  image-rendering: -moz-crisp-edges !important;
-  image-rendering: crisp-edges !important;
+  image-rendering: pixelated !important;        /* Chrome, Edge */
+  image-rendering: -moz-crisp-edges !important; /* Firefox */
+  image-rendering: crisp-edges !important;      /* 標準仕様 */
 }
 
+/* ===== スキャンライン（CRT走査線）=====
+   CRTディスプレイの水平走査線を再現するオーバーレイ。
+   2pxの透明ラインと2pxの半透明黒ラインを交互に繰り返すことで、
+   横縞模様を作り出す。
+
+   技術詳細:
+   - repeating-linear-gradient: 繰り返しグラデーションで横縞を生成
+   - mix-blend-mode: multiply で下のレイヤーと乗算合成
+   - pointer-events: none でマウス操作を透過
+   - z-index: 100 で最前面に配置 */
 .scanlines {
   position: absolute;
   top: 0;
@@ -21,15 +53,21 @@
   pointer-events: none;
   z-index: 100;
   background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.08) 2px,
-    rgba(0, 0, 0, 0.08) 4px
+    0deg,                          /* 0度 = 水平方向のグラデーション */
+    transparent,                   /* 透明の開始 */
+    transparent 2px,               /* 2pxまで透明 */
+    rgba(0, 0, 0, 0.08) 2px,      /* 2pxから半透明黒 */
+    rgba(0, 0, 0, 0.08) 4px       /* 4pxまで半透明黒 → ここから繰り返し */
   );
-  mix-blend-mode: multiply;
+  mix-blend-mode: multiply;       /* 乗算合成: 明るい部分はそのまま、暗い部分はより暗く */
 }
 
+/* ===== ビネットエフェクト（::after 擬似要素） =====
+   CRTディスプレイの四隅が暗くなるビネット効果を再現。
+   radial-gradient（放射状グラデーション）で中央は透明、
+   端に向かって暗くなるグラデーションを重ねる。
+
+   content: "" は擬似要素の生成に必須。 */
 .scanlines::after {
   content: "";
   position: absolute;
@@ -38,14 +76,18 @@
   right: 0;
   bottom: 0;
   background: radial-gradient(
-    ellipse at center,
-    transparent 60%,
-    rgba(0, 0, 0, 0.3) 100%
+    ellipse at center,             /* 楕円形のグラデーション、中心から外側へ */
+    transparent 60%,               /* 中央60%は完全に透明 */
+    rgba(0, 0, 0, 0.3) 100%       /* 端は30%の黒で暗くなる */
   );
   pointer-events: none;
 }
 
+/* ===== 点滅アニメーション =====
+   "▶ 出口へ向かえ" などのテキストに適用される点滅効果。
+   opacity を1→0.5→1とループさせることでゆっくりと明滅する。
+   GameUI.jsx の inline style から animation: "pulse 2s ease-in-out infinite" で参照される。 */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%, 100% { opacity: 1; }        /* 開始と終了: 完全に不透明 */
+  50% { opacity: 0.5; }           /* 中間: 半透明に */
 }

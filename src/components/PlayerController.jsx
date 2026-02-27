@@ -1,22 +1,72 @@
+/**
+ * PlayerController.jsx
+ * ========================================
+ * プレイヤーの移動制御を担当するコンポーネント。
+ *
+ * 主な機能:
+ * - WASDキーによる前後左右の移動（Shiftキーでダッシュ）
+ * - カメラの向きに応じた相対的な移動方向の計算
+ * - 壁との衝突判定（壁をすり抜けないようにする）
+ * - 歩行時の頭の揺れ（ヘッドボブ）アニメーション
+ * - ランタン（手持ちライト）の位置追従
+ * - コンパス用のカメラ向き情報の更新
+ * - ミニマップ用の探索済みエリアの記録
+ * - 近くのアイテム検出・出口到達判定
+ *
+ * Three.js の概念:
+ * - pointLight: 点光源。ランタンのようにある一点から全方向に光を放つライト。
+ * - Vector3: 3次元空間での位置や方向を表すベクトル (x, y, z)。
+ *
+ * React Three Fiber の概念:
+ * - useThree: Three.js の camera（カメラ）や gl（WebGLレンダラー）にアクセスするためのフック。
+ * - useFrame: 毎フレーム（1秒に約60回）呼び出される処理を登録するフック。
+ *   ゲームループのように、毎フレームプレイヤーの位置を更新するために使う。
+ */
 import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { checkGridCollision, worldToGrid } from "../systems/MapGenerator";
 
+/**
+ * PlayerController コンポーネント
+ *
+ * @param {boolean} isLocked - ポインターロック（マウスがゲーム画面にロックされている）状態かどうか
+ * @param {object} dungeon - ダンジョンのデータ（グリッド情報、開始位置、出口位置など）
+ * @param {function} onNearItem - 近くにアイテムがあるときに呼び出されるコールバック関数
+ * @param {Array} items - ゲーム内のアイテム一覧
+ * @param {object} collectedItemsRef - 既に収集済みのアイテムIDを保持するRef
+ * @param {function} onExitReach - 出口に到達したときに呼び出されるコールバック関数
+ * @param {boolean} exitActive - 出口が有効（全アイテム収集済み等）かどうか
+ * @param {object} playerPosRef - プレイヤー位置を外部に伝えるためのRef（ミニマップ等で使用）
+ * @param {object} exploredRef - 探索済みグリッドセルを記録するRef（ミニマップの霧を晴らす用）
+ * @param {object} staminaRef - スタミナ値を保持するRef（ダッシュで消費、歩行で回復）
+ * @param {object} cameraYawRef - カメラのヨー角（水平方向の向き）を保持するRef（コンパス用）
+ */
 export default function PlayerController({
-  isLocked,
-  dungeon,
-  onNearItem,
-  items,
-  collectedItemsRef,
-  onExitReach,
-  exitActive,
-  playerPosRef,
-  exploredRef,
-  staminaRef,
-  cameraYawRef,
+  isLocked, dungeon, onNearItem, items, collectedItemsRef,
+  onExitReach, exitActive, playerPosRef, exploredRef, staminaRef, cameraYawRef,
 }) {
+  /**
+   * useThree フック:
+   * React Three Fiber が管理する Three.js のオブジェクトにアクセスする。
+   * - camera: シーンを映すカメラ。一人称視点ではプレイヤーの「目」にあたる。
+   * - gl: WebGLレンダラー。gl.domElement はレンダリング先の canvas 要素。
+   */
   const { camera, gl } = useThree();
+
+  /**
+   * useRef フック:
+   * React の再レンダリングをまたいで値を保持するための仕組み。
+   * useState と違い、値が変わっても再レンダリングは起こらない。
+   * ゲームのようにフレームごとに高速に値を更新する場面で活躍する。
+   *
+   * - velocity: プレイヤーの移動速度ベクトル（どの方向にどれだけ動くか）
+   * - direction: キー入力から計算された移動方向ベクトル
+   * - keys: 現在押されているキーの状態を記録するオブジェクト
+   * - headBob: 歩行時の頭の揺れアニメーション用カウンター
+   * - initialized: カメラの初期位置設定が完了したかどうかのフラグ
+   * - lanternRef: ランタン（pointLight）への参照。位置をカメラに追従させるために使う。
+   */
   const velocity = useRef(new THREE.Vector3());
   const direction = useRef(new THREE.Vector3());
   const keys = useRef({ w: false, a: false, s: false, d: false, shift: false });
@@ -24,6 +74,14 @@ export default function PlayerController({
   const initialized = useRef(false);
   const lanternRef = useRef();
 
+  /**
+   * useEffect フック（カメラ初期位置の設定）:
+   * useEffect は、コンポーネントがマウント（画面に表示）されたときや、
+   * 依存配列（第2引数の配列）の値が変化したときに実行される。
+   *
+   * ここでは、ダンジョンデータが利用可能になったらカメラをスタート位置に移動する。
+   * initialized フラグを使って、初回のみ実行されるようにしている。
+   */
   useEffect(() => {
     if (!initialized.current && dungeon) {
       camera.position.set(dungeon.startPos.x, dungeon.startPos.y, dungeon.startPos.z);
@@ -31,166 +89,188 @@ export default function PlayerController({
     }
   }, [dungeon, camera]);
 
-  const codeToKey = {
-    KeyW: "w",
-    KeyA: "a",
-    KeyS: "s",
-    KeyD: "d",
-    ShiftLeft: "shift",
-    ShiftRight: "shift",
-  };
+  /**
+   * キーコードとキー名の対応表。
+   * KeyboardEvent.code（"KeyW" など）を内部で使うキー名（"w" など）に変換する。
+   */
+  const codeToKey = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ShiftLeft: "shift", ShiftRight: "shift" };
 
+  /**
+   * useEffect フック（キーボードイベントの登録）:
+   * キーが押された/離されたときのイベントリスナーを document に登録する。
+   * canvas にフォーカスを当て（tabIndex 設定）、キー入力を確実に受け取れるようにする。
+   *
+   * return で返す関数は「クリーンアップ関数」と呼ばれ、
+   * コンポーネントがアンマウント（画面から消える）されるときにイベントリスナーを解除する。
+   * これにより、不要になったリスナーが残り続けるメモリリークを防ぐ。
+   */
   useEffect(() => {
     const canvas = gl.domElement;
     canvas.tabIndex = 0;
     canvas.setAttribute("tabindex", "0");
-
-    const handleKeyDown = (e) => {
-      const key = codeToKey[e.code];
-      if (key) {
-        keys.current[key] = true;
-        e.preventDefault();
-      }
-    };
-    const handleKeyUp = (e) => {
-      const key = codeToKey[e.code];
-      if (key) {
-        keys.current[key] = false;
-        e.preventDefault();
-      }
-    };
-
+    const handleKeyDown = (e) => { const key = codeToKey[e.code]; if (key) { keys.current[key] = true; e.preventDefault(); } };
+    const handleKeyUp = (e) => { const key = codeToKey[e.code]; if (key) { keys.current[key] = false; e.preventDefault(); } };
     document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown, true);
-      document.removeEventListener("keyup", handleKeyUp, true);
-    };
+    return () => { document.removeEventListener("keydown", handleKeyDown, true); document.removeEventListener("keyup", handleKeyUp, true); };
   }, [gl]);
 
-  useEffect(() => {
-    if (isLocked && gl.domElement) {
-      gl.domElement.focus();
-    }
-  }, [isLocked, gl]);
+  /**
+   * useEffect フック（ポインターロック時のフォーカス）:
+   * ポインターがロックされたとき、canvas にフォーカスを移す。
+   * これにより、キーボード入力が確実に canvas に届くようになる。
+   */
+  useEffect(() => { if (isLocked && gl.domElement) { gl.domElement.focus(); } }, [isLocked, gl]);
 
+  /**
+   * useFrame フック（メインのゲームループ）:
+   * 毎フレーム呼ばれ、プレイヤーの移動・衝突判定・各種状態更新を行う。
+   *
+   * @param {object} state - Three.js のレンダリング状態（時刻情報など）
+   * @param {number} delta - 前フレームからの経過時間（秒）。
+   *   移動量を delta に掛けることで、フレームレートに関係なく一定速度で動くようにする。
+   */
   useFrame((state, delta) => {
     if (!isLocked || !dungeon) return;
 
     const { grid, gridW, gridH, cellSize } = dungeon;
 
+    /**
+     * 移動方向の計算:
+     * WASDキーの入力に応じて direction ベクトルを設定する。
+     * z軸: W（前進 +1）/ S（後退 -1）
+     * x軸: A（左 -1）/ D（右 +1）
+     */
     direction.current.set(0, 0, 0);
     if (keys.current.w) direction.current.z += 1;
     if (keys.current.s) direction.current.z -= 1;
     if (keys.current.a) direction.current.x -= 1;
     if (keys.current.d) direction.current.x += 1;
 
+    /**
+     * ダッシュ判定とスタミナ管理:
+     * Shiftキーを押しながら移動するとダッシュ（速度1.67倍）。
+     * ダッシュ中はスタミナが減り、歩行中はスタミナが回復する。
+     */
     const sprinting = keys.current.shift && staminaRef.current > 0 && direction.current.length() > 0;
     const speed = sprinting ? 7.5 : 4.5;
-
-    if (sprinting) {
-      staminaRef.current = Math.max(0, staminaRef.current - delta * 25);
-    } else {
-      staminaRef.current = Math.min(100, staminaRef.current + delta * 15);
-    }
+    if (sprinting) { staminaRef.current = Math.max(0, staminaRef.current - delta * 25); }
+    else { staminaRef.current = Math.min(100, staminaRef.current + delta * 15); }
 
     let moved = false;
 
     if (direction.current.length() > 0) {
+      /**
+       * ベクトルの正規化（normalize）:
+       * direction ベクトルの長さを1にする。
+       * 斜め移動（W+Dなど）時に速度が√2倍にならないようにするため。
+       *
+       * カメラの向きに基づく移動方向の計算:
+       * 1. forward: カメラが向いている前方ベクトルを取得し、Y成分を0にして水平化する。
+       * 2. right: forward と上方向ベクトル(0,1,0) の外積（crossVectors）で右方向を求める。
+       *    外積（クロス積）: 2つのベクトルに直交するベクトルを求める演算。
+       * 3. forward × 入力のZ成分 + right × 入力のX成分 で、最終的な移動ベクトルを作る。
+       */
       direction.current.normalize();
-
       const forward = new THREE.Vector3();
       camera.getWorldDirection(forward);
       forward.y = 0;
       forward.normalize();
-
       const right = new THREE.Vector3();
       right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+      velocity.current.copy(forward).multiplyScalar(direction.current.z).add(right.multiplyScalar(direction.current.x)).multiplyScalar(speed * delta);
 
-      velocity.current
-        .copy(forward)
-        .multiplyScalar(direction.current.z)
-        .add(right.multiplyScalar(direction.current.x))
-        .multiplyScalar(speed * delta);
-
+      /**
+       * 衝突判定（X軸とZ軸を分離して判定）:
+       * X方向とZ方向を別々に判定することで、壁に沿ってスライドする動きを実現。
+       * checkGridCollision: グリッドベースの衝突判定関数。
+       * 壁のあるセルに入ろうとしたら、その方向の移動をキャンセルする。
+       */
       const prevX = camera.position.x;
       const prevZ = camera.position.z;
-
       const newPosX = camera.position.clone();
       newPosX.x += velocity.current.x;
-      if (!checkGridCollision(newPosX, grid, gridW, gridH, cellSize)) {
-        camera.position.x = newPosX.x;
-      }
-
+      if (!checkGridCollision(newPosX, grid, gridW, gridH, cellSize)) { camera.position.x = newPosX.x; }
       const newPosZ = camera.position.clone();
       newPosZ.z += velocity.current.z;
-      if (!checkGridCollision(newPosZ, grid, gridW, gridH, cellSize)) {
-        camera.position.z = newPosZ.z;
-      }
-
+      if (!checkGridCollision(newPosZ, grid, gridW, gridH, cellSize)) { camera.position.z = newPosZ.z; }
       moved = camera.position.x !== prevX || camera.position.z !== prevZ;
-      if (moved) {
-        headBob.current += delta * (sprinting ? 14 : 9);
-      }
+
+      /**
+       * ヘッドボブ（頭の揺れ）:
+       * 移動中にカウンターを増加させ、sin関数で上下に揺らすことで歩行感を演出。
+       * ダッシュ時は揺れが速くなる（14 vs 9）。
+       */
+      if (moved) { headBob.current += delta * (sprinting ? 14 : 9); }
     }
 
+    /**
+     * カメラ高さの設定:
+     * 基本の目線高さは1.6（人間の目の高さを想定）。
+     * 移動中は sin(headBob) で微妙に上下させ、歩行アニメーションを表現する。
+     * Math.sin: 三角関数のサイン。-1～1の間を滑らかに振動する値を返す。
+     */
     const bobAmount = moved ? Math.sin(headBob.current) * 0.04 : 0;
     camera.position.y = 1.6 + bobAmount;
 
-    if (lanternRef.current) {
-      lanternRef.current.position.copy(camera.position);
-      lanternRef.current.position.y -= 0.3;
-    }
+    /**
+     * ランタンの位置更新:
+     * ランタン（pointLight）をカメラに追従させ、少し下にオフセットする。
+     * これにより、プレイヤーが手にランタンを持っているような演出になる。
+     */
+    if (lanternRef.current) { lanternRef.current.position.copy(camera.position); lanternRef.current.position.y -= 0.3; }
 
-    if (playerPosRef) {
-      playerPosRef.current = { x: camera.position.x, z: camera.position.z };
-    }
+    /**
+     * プレイヤー位置の外部通知（ミニマップ用）:
+     */
+    if (playerPosRef) { playerPosRef.current = { x: camera.position.x, z: camera.position.z }; }
 
-    if (cameraYawRef) {
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      cameraYawRef.current = Math.atan2(dir.x, dir.z);
-    }
+    /**
+     * カメラのヨー角（水平方向の向き）を計算（コンパス用）:
+     * Math.atan2(x, z): x と z からラジアン角度を求める逆正接関数。
+     * カメラが向いている方角を数値として取得し、コンパスUIに反映する。
+     */
+    if (cameraYawRef) { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); cameraYawRef.current = Math.atan2(dir.x, dir.z); }
 
+    /**
+     * 探索済みエリアの記録（ミニマップ用）:
+     * worldToGrid: ワールド座標をグリッド座標に変換する関数。
+     * プレイヤー周囲 7×7 マスを「探索済み」としてSetに追加し、
+     * ミニマップの「戦場の霧」（未探索エリアの暗さ）を晴らす。
+     */
     if (exploredRef) {
       const { gx, gy } = worldToGrid(camera.position.x, camera.position.z, gridW, gridH, cellSize);
-      for (let dy = -3; dy <= 3; dy++) {
-        for (let dx = -3; dx <= 3; dx++) {
-          const ex = gx + dx;
-          const ey = gy + dy;
-          if (ex >= 0 && ex < gridW && ey >= 0 && ey < gridH) {
-            exploredRef.current.add(`${ex},${ey}`);
-          }
-        }
-      }
+      for (let dy = -3; dy <= 3; dy++) { for (let dx = -3; dx <= 3; dx++) { const ex = gx + dx; const ey = gy + dy; if (ex >= 0 && ex < gridW && ey >= 0 && ey < gridH) { exploredRef.current.add(`${ex},${ey}`); } } }
     }
 
+    /**
+     * 近くのアイテム検出:
+     * 全アイテムとプレイヤーの距離を計算し、2.5ユニット以内で最も近いアイテムを通知する。
+     * distanceTo: 2点間のユークリッド距離（直線距離）を計算するメソッド。
+     * Y座標はカメラと同じにして、水平方向の距離だけで判定している。
+     */
     if (onNearItem && items) {
-      let closest = null;
-      let minDist = Infinity;
+      let closest = null; let minDist = Infinity;
       const collected = collectedItemsRef ? collectedItemsRef.current : null;
-      items.forEach((item) => {
-        if (collected && collected.has(item.id)) return;
-        const dist = camera.position.distanceTo(
-          new THREE.Vector3(item.position[0], camera.position.y, item.position[2])
-        );
-        if (dist < 2.5 && dist < minDist) {
-          minDist = dist;
-          closest = item;
-        }
-      });
+      items.forEach((item) => { if (collected && collected.has(item.id)) return; const dist = camera.position.distanceTo(new THREE.Vector3(item.position[0], camera.position.y, item.position[2])); if (dist < 2.5 && dist < minDist) { minDist = dist; closest = item; } });
       onNearItem(closest);
     }
 
-    if (onExitReach && exitActive && dungeon.exitPos) {
-      const dist = camera.position.distanceTo(
-        new THREE.Vector3(dungeon.exitPos.x, camera.position.y, dungeon.exitPos.z)
-      );
-      if (dist < 1.8) {
-        onExitReach();
-      }
-    }
+    /**
+     * 出口到達判定:
+     * 出口が有効で、プレイヤーが出口から1.8ユニット以内にいる場合、
+     * onExitReach コールバックを呼び出してステージクリア処理を行う。
+     */
+    if (onExitReach && exitActive && dungeon.exitPos) { const dist = camera.position.distanceTo(new THREE.Vector3(dungeon.exitPos.x, camera.position.y, dungeon.exitPos.z)); if (dist < 1.8) { onExitReach(); } }
   });
 
+  /**
+   * コンポーネントの描画部分:
+   * pointLight（点光源）をランタンとして返す。
+   * - color="#ffeedd": 暖かみのある電球色
+   * - intensity={6}: 光の強さ
+   * - distance={20}: 光が届く最大距離
+   * - decay={1}: 距離による光の減衰率
+   */
   return <pointLight ref={lanternRef} color="#ffeedd" intensity={6} distance={20} decay={1} />;
 }

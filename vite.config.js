@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Three.js が大きいためバンドルサイズが 500KB を超える。
+    // rolldown-vite は manualChunks のオブジェクト構文に非対応のため、警告閾値を引き上げて対応。
     chunkSizeWarningLimit: 1200,
   },
 })
