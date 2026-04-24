@@ -55,6 +55,8 @@ import PlayerController from "./components/PlayerController"; // プレイヤー
 import CollectibleItem from "./components/CollectibleItem";   // 収集アイテム
 import KeyItem from "./components/KeyItem";               // 鍵アイテム
 import Door from "./components/Door";                     // ドア
+import Trap from "./components/Trap";                     // スパイクトラップ
+import Enemy from "./components/Enemy";                   // 敵（追跡型モンスター）
 import ExitPortal from "./components/Goal";               // 脱出ポータル（ゴール）
 
 // ===== UIコンポーネント群 =====
@@ -64,8 +66,8 @@ import Minimap from "./components/UI/Minimap";             // ミニマップ表
 
 // ===== ゲーム定数 =====
 // スコア・スタミナなどの定数は config.js に集約している
-// applyDifficulty は選択中の難易度に応じて MAZE / ITEMS / TORCH / PLAYER を書き換える
-import { ITEMS, PLAYER, SCORING, applyDifficulty } from "./data/config";
+// applyDifficulty は選択中の難易度に応じて MAZE / ITEMS / TORCH / PLAYER / TRAP / ENEMY を書き換える
+import { ITEMS, PLAYER, SCORING, TRAP, ENEMY, applyDifficulty } from "./data/config";
 
 // ===== スタイル =====
 // PS1風のCRTエフェクト（スキャンライン、ビネット）を適用するCSS
@@ -93,7 +95,7 @@ import "./styles/App.css";
  * @param {Object} staminaRef - スタミナ値を格納するref
  * @param {Object} cameraYawRef - カメラのヨー角（水平回転角）を格納するref
  */
-function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, trailRef, staminaRef, cameraYawRef, closedDoorCellsRef, heldKeysRef }) {
+function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, trailRef, staminaRef, cameraYawRef, closedDoorCellsRef, heldKeysRef, onTrapHit, onEnemyHit, enemyPositionsRef }) {
   return (
     <>
       {/* ===== ライティング設定 ===== */}
@@ -146,6 +148,35 @@ function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked
           cellSize={dungeon.cellSize}
           wallHeight={dungeon.wallHeight}
           open={heldKeys.has(d.keyId)}
+        />
+      ))}
+
+      {/* ===== 罠 =====
+          踏むとスタミナを減らすスパイクトラップ。onTrapHit は App 側で
+          クールダウン管理されるので、ここでは毎フレーム呼んで良い */}
+      {(dungeon.traps || []).map((t) => (
+        <Trap
+          key={`${dungeon.seed}_${t.id}`}
+          id={t.id}
+          position={t.position}
+          phaseOffset={t.phaseOffset}
+          onHit={onTrapHit}
+        />
+      ))}
+
+      {/* ===== 敵 =====
+          視界内のプレイヤーを BFS 経路で追跡。攻撃範囲でダメージを与える */}
+      {(dungeon.enemies || []).map((e) => (
+        <Enemy
+          key={`${dungeon.seed}_${e.id}`}
+          id={e.id}
+          spawnPos={e.spawnPos}
+          dungeon={dungeon}
+          playerPosRef={playerPosRef}
+          isLocked={isLocked}
+          onHit={onEnemyHit}
+          closedDoorCellsRef={closedDoorCellsRef}
+          positionsRef={enemyPositionsRef}
         />
       ))}
 
@@ -268,6 +299,10 @@ export default function App() {
   // PlayerController の近接検出で使う（鍵が取得済みかの即時判定）
   const heldKeysRef = useRef(new Set());
 
+  // 敵の現在位置を記録する Map<enemyId, {x, z}>。Enemy コンポーネントが
+  // 毎フレーム更新、Minimap が参照する（state だと毎フレーム再レンダリングで重い）
+  const enemyPositionsRef = useRef(new Map());
+
   // スタミナ値のリアルタイム参照
   const staminaRef = useRef(PLAYER.STAMINA_MAX);
 
@@ -350,6 +385,44 @@ export default function App() {
    * - スコアに ITEMS.SCORE_PER_ITEM 点を加算
    * - 収集数を1増加
    */
+  // 被ダメージのクールダウン管理用 ref。キーは罠/敵の id、値は最後に被弾した時刻（ms）
+  // useRef を使うことで、値変更による再レンダリングを避ける
+  const hitCooldownRef = useRef({});
+
+  /**
+   * 被ダメージ処理。罠・敵の両方から呼ばれる。
+   *
+   * @param {string} sourceId - ダメージ源の id（罠 id or 敵 id）
+   * @param {number} damageAmount - スタミナから引く量
+   * @param {number} cooldownSec - 同一ソースから連続被弾しない猶予秒数
+   */
+  const applyDamage = useCallback((sourceId, damageAmount, cooldownSec) => {
+    // プレイ中でないときはダメージを無視（スタート画面・クリア画面で被弾しないように）
+    if (!isLocked || cleared) return;
+
+    const now = Date.now();
+    const last = hitCooldownRef.current[sourceId] || 0;
+    if (now - last < cooldownSec * 1000) return;
+    hitCooldownRef.current[sourceId] = now;
+
+    // staminaRef を直接減らす（毎フレーム参照される真実の値）。
+    // state にも反映するが、state は 100ms 間隔の setInterval で更新されるので
+    // ダメージ直後に UI に反映されないケースもある → 今回は即反映する
+    staminaRef.current = Math.max(0, staminaRef.current - damageAmount);
+    setStamina(staminaRef.current);
+    Audio.damage();
+  }, [isLocked, cleared]);
+
+  /** 罠からのダメージ呼び出し */
+  const handleTrapHit = useCallback((trapId) => {
+    applyDamage(trapId, TRAP.DAMAGE_PER_HIT, TRAP.HIT_COOLDOWN);
+  }, [applyDamage]);
+
+  /** 敵からのダメージ呼び出し */
+  const handleEnemyHit = useCallback((enemyId) => {
+    applyDamage(enemyId, ENEMY.DAMAGE_PER_HIT, ENEMY.HIT_COOLDOWN);
+  }, [applyDamage]);
+
   /**
    * 鍵取得時のハンドラ
    * - heldKeys に追加 → 該当する Door コンポーネントが open=true になり開く
@@ -448,6 +521,9 @@ export default function App() {
     trailRef.current = new Set();
     playerPosRef.current = { x: 0, z: 0 };
     startTimeRef.current = null;
+    // 罠・敵の被弾クールダウンと敵位置もリセット
+    hitCooldownRef.current = {};
+    enemyPositionsRef.current = new Map();
   }, [difficulty]);
 
   /**
@@ -468,6 +544,9 @@ export default function App() {
     trailRef.current = new Set();
     playerPosRef.current = { x: 0, z: 0 };
     startTimeRef.current = null;
+    // 罠・敵の被弾クールダウンと敵位置もリセット
+    hitCooldownRef.current = {};
+    enemyPositionsRef.current = new Map();
     // 新記録フラグは前回プレイ固有のものなのでリセット
     setNewBestTime(false);
     setNewBestScore(false);
@@ -541,6 +620,9 @@ export default function App() {
           cameraYawRef={cameraYawRef}
           closedDoorCellsRef={closedDoorCellsRef}
           heldKeysRef={heldKeysRef}
+          onTrapHit={handleTrapHit}
+          onEnemyHit={handleEnemyHit}
+          enemyPositionsRef={enemyPositionsRef}
         />
       </Canvas>
 
@@ -584,6 +666,7 @@ export default function App() {
           items={items}
           collectedItemsRef={collectedItemsRef}
           heldKeys={heldKeys}
+          enemyPositionsRef={enemyPositionsRef}
           exitActive={exitActive}
           cameraYawRef={cameraYawRef}
         />

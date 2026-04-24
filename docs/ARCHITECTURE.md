@@ -300,6 +300,8 @@ App.setNearItem(closest)
 | `src/components/CollectibleItem.jsx` | 収集アイテム |
 | `src/components/KeyItem.jsx` | 鍵アイテム（ドアを開ける） |
 | `src/components/Door.jsx` | ドア（閉じている時は衝突判定で壁扱い） |
+| `src/components/Trap.jsx` | スパイクトラップ（踏むとスタミナ減） |
+| `src/components/Enemy.jsx` | 敵 AI（視界内のプレイヤーを BFS 経路で追跡） |
 | `src/components/Goal.jsx` | 出口ポータル |
 | `src/components/UI/GameUI.jsx` | HUD・タイトル・クリア画面 |
 | `src/components/UI/Minimap.jsx` | ミニマップ（霧の戦場） |

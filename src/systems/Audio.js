@@ -216,6 +216,25 @@ export function portalActivate() {
   setTimeout(() => playTone({ freq: 220, endFreq: 880, duration: 0.5, type: "square", gain: 0.08 }), 120);
 }
 
+/** 被ダメージ: 不快な下降ビープ + ノイズ */
+export function damage() {
+  if (!ensureContext()) return;
+  playTone({ freq: 220, endFreq: 80, duration: 0.3, type: "sawtooth", gain: 0.22 });
+  playNoise({ duration: 0.25, gain: 0.12, lowpassHz: 600 });
+}
+
+/** 罠の予兆音（刃が出る直前の金属音） */
+export function trapWarn() {
+  if (!ensureContext()) return;
+  playTone({ freq: 1200, duration: 0.1, type: "square", gain: 0.08, release: 0.02 });
+}
+
+/** 敵の唸り声（低音の不穏な持続音） */
+export function enemyGrowl() {
+  if (!ensureContext()) return;
+  playTone({ freq: 80, endFreq: 140, duration: 0.5, type: "sawtooth", gain: 0.15 });
+}
+
 /** クリア: アルペジオ風の上昇ファンファーレ */
 export function clear() {
   if (!ensureContext()) return;

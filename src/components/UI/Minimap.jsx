@@ -28,10 +28,11 @@ import { useRef, useEffect, useCallback, useState } from "react";
  * @param {Array} items - アイテム一覧
  * @param {Object} collectedItemsRef - 収集済みアイテムIDの Set を保持するref
  * @param {Set<string>} heldKeys - 取得済みの鍵 ID 集合（State）
+ * @param {Object} enemyPositionsRef - 敵位置の Map<id, {x,z}> を保持するref
  * @param {boolean} exitActive - 出口が有効かどうか（全アイテム収集後にtrue）
  * @param {Object} cameraYawRef - カメラのヨー角（水平回転角度）のref
  */
-export default function Minimap({ dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, exitActive, cameraYawRef }) {
+export default function Minimap({ dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, enemyPositionsRef, exitActive, cameraYawRef }) {
   // canvas DOM要素への参照
   const canvasRef = useRef();
 
@@ -168,6 +169,39 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, trailRef, 
       ctx.fillRect(door.gx * scale, door.gy * scale, scale, scale);
     });
 
+    // ===== 敵の描画 =====
+    // 敵位置（リアルタイム追跡）を赤い円で表示。探索済みセルのみ。
+    if (enemyPositionsRef && enemyPositionsRef.current) {
+      for (const pos of enemyPositionsRef.current.values()) {
+        const ex = Math.floor((pos.x + offsetX) / cellSize);
+        const ey = Math.floor((pos.z + offsetZ) / cellSize);
+        if (!explored.has(`${ex},${ey}`)) continue;
+        const ecx = ((pos.x + offsetX) / cellSize) * scale;
+        const ecy = ((pos.z + offsetZ) / cellSize) * scale;
+        ctx.fillStyle = "#ff3333";
+        ctx.beginPath();
+        ctx.arc(ecx, ecy, scale * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ===== 罠の描画 =====
+    // 探索済みセルの罠を赤い X マークで表示
+    (dungeon.traps || []).forEach((trap) => {
+      if (!explored.has(`${trap.gx},${trap.gy}`)) return;
+      ctx.strokeStyle = "#ff4444";
+      ctx.lineWidth = Math.max(1, scale * 0.15);
+      const cx = trap.gx * scale + scale / 2;
+      const cy = trap.gy * scale + scale / 2;
+      const r = scale * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy - r);
+      ctx.lineTo(cx + r, cy + r);
+      ctx.moveTo(cx + r, cy - r);
+      ctx.lineTo(cx - r, cy + r);
+      ctx.stroke();
+    });
+
     // ===== 出口の描画 =====
     // 全アイテム収集後に緑色の四角で出口を表示
     if (exitActive && dungeon.exitGrid) {
@@ -232,7 +266,7 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, trailRef, 
     // 次フレームでも draw を呼び出す（ループ）
     // requestAnimationFrame はブラウザの描画タイミングに合わせて実行される（通常60fps）
     animRef.current = requestAnimationFrame(draw);
-  }, [dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, exitActive, cameraYawRef, grid, gridW, gridH, cellSize, scale, expanded]);
+  }, [dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, enemyPositionsRef, exitActive, cameraYawRef, grid, gridW, gridH, cellSize, scale, expanded]);
 
   // ===== アニメーションループの開始と停止 =====
   useEffect(() => {

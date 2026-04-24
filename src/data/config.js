@@ -101,6 +101,44 @@ export const TORCH = {
   CORRIDOR_CHANCE: 0.3,  // 通路へのたいまつ配置確率（30%）
 };
 
+/**
+ * TRAP — 罠（スパイクトラップ）のパラメータ
+ *
+ * COUNT: ダンジョン内に配置する罠の数
+ * DAMAGE_RADIUS: 罠の攻撃範囲（メートル相当）
+ * DAMAGE_PER_HIT: 1 回の被弾でスタミナを減らす量
+ * CYCLE_DURATION: 「隠→予兆→発動→隠」の 1 周期の長さ（秒）
+ * ACTIVE_DURATION: 1 周期中で刃が出ている時間（秒）
+ * HIT_COOLDOWN: 同じ罠から連続被弾する間隔の最小値（秒）。短すぎると即ゲームオーバー
+ */
+export const TRAP = {
+  COUNT: 3,
+  DAMAGE_RADIUS: 0.8,
+  DAMAGE_PER_HIT: 30,
+  CYCLE_DURATION: 2.2,
+  ACTIVE_DURATION: 0.8,
+  HIT_COOLDOWN: 1.2,
+};
+
+/**
+ * ENEMY — 敵（単純な追跡型モンスター）のパラメータ
+ *
+ * COUNT: ダンジョン内に配置する敵の数
+ * SPEED: 敵の移動速度（メートル/秒）。PLAYER.SPEED より少し遅めに
+ * SIGHT_RANGE: 敵がプレイヤーを認識する視界距離（メートル相当）
+ * ATTACK_RANGE: 攻撃が届く距離
+ * DAMAGE_PER_HIT: 1 回の攻撃でスタミナを減らす量
+ * HIT_COOLDOWN: 同じ敵から連続被弾する間隔（秒）
+ */
+export const ENEMY = {
+  COUNT: 1,
+  SPEED: 2.5,
+  SIGHT_RANGE: 7.0,
+  ATTACK_RANGE: 1.2,
+  DAMAGE_PER_HIT: 20,
+  HIT_COOLDOWN: 1.5,
+};
+
 // ============================================================
 // 難易度プリセット
 // ============================================================
@@ -128,6 +166,8 @@ const DIFFICULTY_PRESETS = {
     ITEMS: { COUNT: 3 },
     TORCH: { MAX_COUNT: 30, CORRIDOR_CHANCE: 0.5 },
     PLAYER: { STAMINA_MAX: 130, STAMINA_REGEN: 20 },
+    TRAP: { COUNT: 1, DAMAGE_PER_HIT: 15 },
+    ENEMY: { COUNT: 0 },
   },
   normal: {},
   hard: {
@@ -135,6 +175,8 @@ const DIFFICULTY_PRESETS = {
     ITEMS: { COUNT: 7 },
     TORCH: { MAX_COUNT: 20, CORRIDOR_CHANCE: 0.15 },
     PLAYER: { STAMINA_MAX: 70, STAMINA_DRAIN: 35 },
+    TRAP: { COUNT: 6, DAMAGE_PER_HIT: 40 },
+    ENEMY: { COUNT: 2, SPEED: 3.0 },
   },
 };
 
@@ -145,6 +187,8 @@ const BASE_SNAPSHOT = {
   ITEMS: { ...ITEMS },
   TORCH: { ...TORCH },
   PLAYER: { ...PLAYER },
+  TRAP: { ...TRAP },
+  ENEMY: { ...ENEMY },
 };
 
 /**
@@ -163,6 +207,8 @@ export function applyDifficulty(difficulty) {
   Object.assign(ITEMS, BASE_SNAPSHOT.ITEMS);
   Object.assign(TORCH, BASE_SNAPSHOT.TORCH);
   Object.assign(PLAYER, BASE_SNAPSHOT.PLAYER);
+  Object.assign(TRAP, BASE_SNAPSHOT.TRAP);
+  Object.assign(ENEMY, BASE_SNAPSHOT.ENEMY);
 
   const preset = DIFFICULTY_PRESETS[difficulty];
   if (!preset) return;
@@ -171,4 +217,6 @@ export function applyDifficulty(difficulty) {
   if (preset.ITEMS) Object.assign(ITEMS, preset.ITEMS);
   if (preset.TORCH) Object.assign(TORCH, preset.TORCH);
   if (preset.PLAYER) Object.assign(PLAYER, preset.PLAYER);
+  if (preset.TRAP) Object.assign(TRAP, preset.TRAP);
+  if (preset.ENEMY) Object.assign(ENEMY, preset.ENEMY);
 }

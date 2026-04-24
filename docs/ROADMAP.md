@@ -73,15 +73,25 @@ Claude Code は **Phase 0 → Phase 1 → ...** の順に進めることを推�
 
 **目的**: 「探索するだけ」から「考えて動く」ゲームに昇華する。
 
-### Milestone 2.1: 動的オブジェクト
-- [x] 開閉するドア（鍵アイテムと対応）（2026-04-24 完了 — first cut として 1 つの鍵・ドア対を実装）
-  - `src/components/Door.jsx` / `src/components/KeyItem.jsx` を新設
+### ~~Milestone 2.1: 動的オブジェクト~~（2026-04-24 完了）
+- [x] 開閉するドア（鍵アイテムと対応）
+  - `src/components/Door.jsx` / `src/components/KeyItem.jsx`
   - `MapGenerator.js` に `bfsShortestPath` と鍵/ドア配置ロジック追加
-  - `checkGridCollision` に `closedDoorCells` オプションを追加
+  - `checkGridCollision` に `closedDoorCells` オプション追加
   - ミニマップ・NearItemIndicator も鍵/ドア表示に対応
-  - 拡張余地: 複数組の鍵/ドア、色違い、難易度によって鍵数を増減
-- [ ] 回転する罠・床落下ギミック
-- [ ] 単純な敵 AI（視界内のプレイヤーを追いかける・スタミナを削る）
+  - 拡張余地: 複数組の鍵/ドア、色違い、難易度による鍵数増減
+- [x] スパイクトラップ（床から周期的に突き出る刃）
+  - `src/components/Trap.jsx`（隠→予兆→発動の 3 段階サイクル）
+  - `config.js` に `TRAP` 定数、難易度プリセットで配置数・ダメージ量を調整
+  - 被弾時にスタミナが減少、クールダウン付き（`hitCooldownRef`）
+  - ミニマップ上で赤い X マークで表示
+- [x] 単純な敵 AI（視界内のプレイヤーを追いかける・スタミナを削る）
+  - `src/components/Enemy.jsx` + セル単位の `hasLineOfSight` 判定
+  - BFS で最短経路を 0.25 秒ごとに再計算し、等速移動
+  - プレイヤーと同じ衝突判定ロジックでドアも考慮
+  - 視界捕捉時に唸り声、攻撃範囲内で周期的にダメージ
+  - ミニマップに敵位置をリアルタイム表示（赤い円）
+  - 拡張余地: 徘徊パターン、攻撃アニメ、複数タイプの敵
 
 ### Milestone 2.2: 複数フロア
 - [ ] 階段オブジェクトで次フロアへ

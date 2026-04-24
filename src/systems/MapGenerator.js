@@ -21,7 +21,7 @@
  * ============================================================
  */
 
-import { MAZE, ITEMS, TORCH, PLAYER } from "../data/config";
+import { MAZE, ITEMS, TORCH, PLAYER, TRAP, ENEMY } from "../data/config";
 
 /**
  * mulberry32(a)
@@ -658,6 +658,81 @@ export function generateDungeon(seed = Date.now()) {
     }
   }
 
+  // ─── 罠の配置 ───
+  // スタート/出口/アイテム/鍵/ドアと被らない通路セルから TRAP.COUNT 個を選ぶ。
+  // スタート近傍（マンハッタン距離 2 以内）も除外して、即ダメージを避ける。
+  const traps = [];
+  if (TRAP.COUNT > 0) {
+    const occupiedForTraps = new Set([
+      `${startGx},${startGy}`,
+      `${farthest.x},${farthest.y}`,
+      ...items.map((it) => `${it.gx},${it.gy}`),
+      ...keys.map((k) => `${k.gx},${k.gy}`),
+      ...doors.map((d) => `${d.gx},${d.gy}`),
+    ]);
+
+    const candidates = [];
+    for (let y = 1; y < gridH - 1; y += 2) {
+      for (let x = 1; x < gridW - 1; x += 2) {
+        if (grid[y][x] !== 0) continue;
+        if (occupiedForTraps.has(`${x},${y}`)) continue;
+        // スタート近傍を除外
+        if (Math.abs(x - startGx) + Math.abs(y - startGy) <= 2) continue;
+        candidates.push({ gx: x, gy: y });
+      }
+    }
+
+    const rngTrap = mulberry32(seed + 55);
+    candidates.sort(() => 0.5 - rngTrap());
+
+    // 罠同士も離す（マンハッタン距離 3 以上）
+    for (const c of candidates) {
+      const tooClose = traps.some(
+        (t) => Math.abs(t.gx - c.gx) + Math.abs(t.gy - c.gy) < 3
+      );
+      if (tooClose) continue;
+      const pos = gridToWorld(c.gx, c.gy, gridW, gridH, CELL_SIZE);
+      traps.push({
+        id: `trap_${traps.length}`,
+        gx: c.gx,
+        gy: c.gy,
+        position: [pos.x, 0, pos.z],
+        // 位相をバラしてダンジョン全体が同期して動かないようにする
+        phaseOffset: rngTrap(),
+      });
+      if (traps.length >= TRAP.COUNT) break;
+    }
+  }
+
+  // ─── 敵の配置 ───
+  // スタートから十分離れた通路セルに配置。罠やアイテムとの重なりは許容（位置被りは稀）
+  const enemies = [];
+  if (ENEMY.COUNT > 0) {
+    const enemyCandidates = [];
+    for (let y = 1; y < gridH - 1; y += 2) {
+      for (let x = 1; x < gridW - 1; x += 2) {
+        if (grid[y][x] !== 0) continue;
+        // スタートから最低 4 セル離れている
+        if (Math.abs(x - startGx) + Math.abs(y - startGy) < 4) continue;
+        // 出口セルは避ける
+        if (x === farthest.x && y === farthest.y) continue;
+        enemyCandidates.push({ gx: x, gy: y });
+      }
+    }
+    const rngEnemy = mulberry32(seed + 77);
+    enemyCandidates.sort(() => 0.5 - rngEnemy());
+    for (let i = 0; i < Math.min(ENEMY.COUNT, enemyCandidates.length); i++) {
+      const c = enemyCandidates[i];
+      const pos = gridToWorld(c.gx, c.gy, gridW, gridH, CELL_SIZE);
+      enemies.push({
+        id: `enemy_${i}`,
+        spawnGx: c.gx,
+        spawnGy: c.gy,
+        spawnPos: [pos.x, 0, pos.z],
+      });
+    }
+  }
+
   // ─── ダンジョンデータを返す ───
   return {
     grid,                // 迷路の 2D 配列（0=通路, 1=壁）
@@ -673,6 +748,8 @@ export function generateDungeon(seed = Date.now()) {
     wallPositions,       // 壁のワールド座標配列
     doors,               // ドア配列 [{id, gx, gy, position, keyId}]
     keys,                // 鍵配列 [{id, gx, gy, position, opensDoorId}]
+    traps,               // 罠配列 [{id, gx, gy, position, phaseOffset}]
+    enemies,             // 敵配列 [{id, spawnGx, spawnGy, spawnPos}]
     seed,                // 使用したシード値（再現用）
   };
 }
