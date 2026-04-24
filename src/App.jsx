@@ -33,6 +33,17 @@ import { PointerLockControls } from "@react-three/drei";
 // ===== ゲームシステム =====
 // generateDungeon: シード値からダンジョンのマップデータを生成する関数
 import { generateDungeon } from "./systems/MapGenerator";
+// getBestTime / getBestScore / updateBestRecord:
+// localStorage を使ったベスト記録の永続化ユーティリティ
+import {
+  getBestTime,
+  getBestScore,
+  updateBestRecord,
+  getSavedDifficulty,
+  saveDifficulty,
+} from "./systems/Storage";
+// サウンドシステム: Web Audio API 手続き合成 SE・BGM
+import * as Audio from "./systems/Audio";
 
 // ===== 3Dコンポーネント群 =====
 // それぞれのコンポーネントが3Dオブジェクトを描画する
@@ -42,12 +53,19 @@ import Ceiling from "./components/Ceiling";               // 天井
 import Torches from "./components/Torch";                 // 松明（たいまつ）ライト
 import PlayerController from "./components/PlayerController"; // プレイヤーの移動と衝突判定
 import CollectibleItem from "./components/CollectibleItem";   // 収集アイテム
+import KeyItem from "./components/KeyItem";               // 鍵アイテム
+import Door from "./components/Door";                     // ドア
 import ExitPortal from "./components/Goal";               // 脱出ポータル（ゴール）
 
 // ===== UIコンポーネント群 =====
 import GameUI from "./components/UI/GameUI";               // HUD（スコア、タイマー等の表示）
 import NearItemIndicator from "./components/UI/NearItemIndicator"; // アイテム近接時の[E]プロンプト
 import Minimap from "./components/UI/Minimap";             // ミニマップ表示
+
+// ===== ゲーム定数 =====
+// スコア・スタミナなどの定数は config.js に集約している
+// applyDifficulty は選択中の難易度に応じて MAZE / ITEMS / TORCH / PLAYER を書き換える
+import { ITEMS, PLAYER, SCORING, applyDifficulty } from "./data/config";
 
 // ===== スタイル =====
 // PS1風のCRTエフェクト（スキャンライン、ビネット）を適用するCSS
@@ -75,7 +93,7 @@ import "./styles/App.css";
  * @param {Object} staminaRef - スタミナ値を格納するref
  * @param {Object} cameraYawRef - カメラのヨー角（水平回転角）を格納するref
  */
-function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, staminaRef, cameraYawRef }) {
+function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked, items, collectedItemsRef, onNearItem, exitActive, onExitReach, playerPosRef, exploredRef, trailRef, staminaRef, cameraYawRef, closedDoorCellsRef, heldKeysRef }) {
   return (
     <>
       {/* ===== ライティング設定 ===== */}
@@ -113,6 +131,24 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsR
         <CollectibleItem key={`${dungeon.seed}_${item.id}`} position={item.position} id={item.id} onCollect={onItemCollect} />
       ))}
 
+      {/* ===== 鍵アイテム =====
+          ドアを開くための鍵。拾うと heldKeys に追加される */}
+      {(dungeon.keys || []).map((k) => (
+        <KeyItem key={`${dungeon.seed}_${k.id}`} position={k.position} id={k.id} onCollect={onKeyCollect} />
+      ))}
+
+      {/* ===== ドア =====
+          対応する鍵を所持していれば open=true。閉じている時は衝突判定で壁扱い */}
+      {(dungeon.doors || []).map((d) => (
+        <Door
+          key={`${dungeon.seed}_${d.id}`}
+          position={d.position}
+          cellSize={dungeon.cellSize}
+          wallHeight={dungeon.wallHeight}
+          open={heldKeys.has(d.keyId)}
+        />
+      ))}
+
       {/* 脱出ポータル（ゴール）。active=true のとき視覚的に有効化される */}
       <ExitPortal position={dungeon.exitPos} active={exitActive} />
 
@@ -129,8 +165,11 @@ function DungeonScene({ dungeon, onItemCollect, isLocked, items, collectedItemsR
         exitActive={exitActive}
         playerPosRef={playerPosRef}
         exploredRef={exploredRef}
+        trailRef={trailRef}
         staminaRef={staminaRef}
         cameraYawRef={cameraYawRef}
+        closedDoorCellsRef={closedDoorCellsRef}
+        heldKeysRef={heldKeysRef}
       />
 
       {/* シーンの背景色を暗い茶色に設定。attach="background" で Scene.background に紐付く */}
@@ -171,6 +210,10 @@ export default function App() {
   // useState ではなく useRef を使うことで、アイテム取得時にシーン全体の再描画を防ぐ
   const collectedItemsRef = useRef(new Set());
 
+  // 取得済みの鍵 ID 集合。これを state にしているのは Door の open prop に
+  // 即時反映させる必要があるため（PlayerController のフレーム処理では間に合わない）
+  const [heldKeys, setHeldKeys] = useState(() => new Set());
+
   // ポインターロック状態（true = ゲームプレイ中、false = メニュー/一時停止）
   const [isLocked, setIsLocked] = useState(false);
 
@@ -184,7 +227,23 @@ export default function App() {
   const [elapsedTime, setElapsedTime] = useState(0);
 
   // スタミナ（ダッシュで消費、静止で回復）
-  const [stamina, setStamina] = useState(100);
+  const [stamina, setStamina] = useState(PLAYER.STAMINA_MAX);
+
+  // 難易度（localStorage から初期値を遅延ロード）
+  // 初期化時に applyDifficulty を呼んで、config 側の値を該当難易度で上書きしておく
+  const [difficulty, setDifficultyState] = useState(() => {
+    const d = getSavedDifficulty();
+    applyDifficulty(d);
+    return d;
+  });
+
+  // ベスト記録（難易度別。localStorage から遅延ロード）
+  const [bestTime, setBestTime] = useState(() => getBestTime(difficulty));
+  const [bestScore, setBestScore] = useState(() => getBestScore(difficulty));
+
+  // 新記録フラグ（クリア画面での演出用、リスタートでリセット）
+  const [newBestTime, setNewBestTime] = useState(false);
+  const [newBestScore, setNewBestScore] = useState(false);
 
   // ===== Ref（参照値）=====
   // useRef は値が変わっても再レンダリングを発生させない。
@@ -196,8 +255,21 @@ export default function App() {
   // 探索済みグリッドセルの記録（ミニマップの霧に使用）
   const exploredRef = useRef(new Set());
 
+  // プレイヤーの実際の通過履歴（ミニマップのブレッドクラム表示に使用）
+  // exploredRef は周囲7x7を記録するのに対し、こちらは中心セルだけを記録する
+  const trailRef = useRef(new Set());
+
+  // 閉じているドアのセル座標（"gx,gy" 形式）の Set。
+  // PlayerController の衝突判定に毎フレーム参照される。
+  // heldKeys / dungeon の変化に応じて useEffect で中身を更新する（ref 参照は変えない）
+  const closedDoorCellsRef = useRef(new Set());
+
+  // heldKeys State を毎フレーム参照したい箇所用の ref ミラー。
+  // PlayerController の近接検出で使う（鍵が取得済みかの即時判定）
+  const heldKeysRef = useRef(new Set());
+
   // スタミナ値のリアルタイム参照
-  const staminaRef = useRef(100);
+  const staminaRef = useRef(PLAYER.STAMINA_MAX);
 
   // カメラのヨー角（水平回転角度）。コンパスとミニマップの方向表示に使用
   const cameraYawRef = useRef(0);
@@ -226,6 +298,20 @@ export default function App() {
 
   // 全アイテムを収集したら出口（ExitPortal）が有効になる
   const exitActive = itemCount >= totalItems;
+
+  // heldKeys / dungeon が変わったら closedDoorCellsRef と heldKeysRef の中身を更新する。
+  // ref オブジェクト自体は差し替えないので、毎フレーム参照する PlayerController は
+  // 常に最新値を見ることになる。
+  useEffect(() => {
+    const next = new Set();
+    for (const door of dungeon.doors || []) {
+      if (!heldKeys.has(door.keyId)) {
+        next.add(`${door.gx},${door.gy}`);
+      }
+    }
+    closedDoorCellsRef.current = next;
+    heldKeysRef.current = heldKeys;
+  }, [dungeon, heldKeys]);
 
   // ===== タイマーの副作用 =====
   // ゲーム開始（ポインターロック時）にタイマーを起動し、
@@ -261,25 +347,108 @@ export default function App() {
   /**
    * アイテム収集時のハンドラ
    * - 収集済みセットに追加
-   * - スコアに10点加算
+   * - スコアに ITEMS.SCORE_PER_ITEM 点を加算
    * - 収集数を1増加
    */
+  /**
+   * 鍵取得時のハンドラ
+   * - heldKeys に追加 → 該当する Door コンポーネントが open=true になり開く
+   * - 取得音を鳴らす
+   */
+  const handleKeyCollect = useCallback((keyId) => {
+    Audio.pickup();
+    setHeldKeys((prev) => {
+      const next = new Set(prev);
+      next.add(keyId);
+      return next;
+    });
+  }, []);
+
   const handleItemCollect = useCallback((id) => {
     collectedItemsRef.current.add(id);
-    setScore((prev) => prev + 10);
-    setItemCount((prev) => prev + 1);
-  }, []);
+    setScore((prev) => {
+      const next = prev + ITEMS.SCORE_PER_ITEM;
+      return next;
+    });
+    setItemCount((prev) => {
+      const next = prev + 1;
+      // 最後のアイテムを取った時点でポータル活性化音を鳴らす
+      if (next >= totalItems) {
+        Audio.portalActivate();
+      } else {
+        Audio.pickup();
+      }
+      return next;
+    });
+  }, [totalItems]);
 
   /**
    * 出口到達時のハンドラ
-   * ゲームをクリア状態にし、タイマーを停止する
+   * ゲームをクリア状態にし、タイマーを停止。
+   * タイムボーナス・クリアボーナスを加えた最終スコアを計算し、
+   * localStorage のベスト記録と比較して更新する。
    */
   const handleExitReach = useCallback(() => {
     if (!cleared) {
       setCleared(true);
       if (timerRef.current) clearInterval(timerRef.current);
+
+      // BGM を止めてクリアファンファーレを鳴らす
+      Audio.bgm.stop();
+      Audio.clear();
+
+      // クリア時点の経過時間を確定する
+      // startTimeRef が無い稀なケースに備えて elapsedTime の state を使用する
+      const finalTime =
+        startTimeRef.current !== null
+          ? (Date.now() - startTimeRef.current) / 1000
+          : elapsedTime;
+
+      // GameUI と同じ計算式で最終スコアを算出する
+      // （将来的に共通関数に抽出する価値あり。現状は重複を許容）
+      const timeBonus = Math.max(0, SCORING.TIME_BONUS_BASE - Math.floor(finalTime));
+      const finalScore = score + timeBonus + SCORING.CLEAR_BONUS;
+
+      // localStorage を更新し、更新有無を新記録フラグに反映（難易度別に保存）
+      const result = updateBestRecord(finalTime, finalScore, difficulty);
+      setNewBestTime(result.bestTimeUpdated);
+      setNewBestScore(result.bestScoreUpdated);
+
+      // ベスト表示値を最新に（更新があった場合は今回値、無ければ既存値を再取得）
+      setBestTime(getBestTime(difficulty));
+      setBestScore(getBestScore(difficulty));
     }
-  }, [cleared]);
+  }, [cleared, elapsedTime, score, difficulty]);
+
+  /**
+   * 難易度変更ハンドラ
+   * - config.js のグローバル定数を該当難易度で上書き
+   * - 選択を localStorage に保存
+   * - ダンジョンを即座に作り直し、ベスト記録も該当難易度のものに差し替え
+   *
+   * ポインターロック中は変更不可（スタート画面でのみ選べる想定）
+   */
+  const handleDifficultyChange = useCallback((newDifficulty) => {
+    if (newDifficulty === difficulty) return;
+    applyDifficulty(newDifficulty);
+    saveDifficulty(newDifficulty);
+    setDifficultyState(newDifficulty);
+    setBestTime(getBestTime(newDifficulty));
+    setBestScore(getBestScore(newDifficulty));
+    // seed を更新して新しい難易度のダンジョンを再生成
+    setSeed(Date.now());
+    setScore(0);
+    setItemCount(0);
+    collectedItemsRef.current = new Set();
+    setHeldKeys(new Set());
+    setElapsedTime(0);
+    setStamina(PLAYER.STAMINA_MAX);
+    staminaRef.current = PLAYER.STAMINA_MAX;
+    exploredRef.current = new Set();
+    trailRef.current = new Set();
+    playerPosRef.current = { x: 0, z: 0 };
+    startTimeRef.current = null;
+  }, [difficulty]);
 
   /**
    * リスタート時のハンドラ
@@ -290,30 +459,41 @@ export default function App() {
     setScore(0);
     setItemCount(0);
     collectedItemsRef.current = new Set();
+    setHeldKeys(new Set());
     setCleared(false);
     setElapsedTime(0);
-    setStamina(100);
-    staminaRef.current = 100;
+    setStamina(PLAYER.STAMINA_MAX);
+    staminaRef.current = PLAYER.STAMINA_MAX;
     exploredRef.current = new Set();
+    trailRef.current = new Set();
     playerPosRef.current = { x: 0, z: 0 };
     startTimeRef.current = null;
+    // 新記録フラグは前回プレイ固有のものなのでリセット
+    setNewBestTime(false);
+    setNewBestScore(false);
   }, []);
 
   /**
    * ポインターロック時（ゲーム開始/再開時）のハンドラ
-   * クリア済みの場合はリスタートしてからロック
+   * クリア済みの場合はリスタートしてからロック。
+   * ユーザジェスチャでしか開始できない AudioContext もここで起動する。
    */
   const handleLock = useCallback(() => {
     if (cleared) {
       handleRestart();
     }
+    // ブラウザのオートプレイ制約をクリアするため、ゲーム開始クリックで起動
+    Audio.ensureContext();
+    Audio.bgm.start();
     setIsLocked(true);
   }, [cleared, handleRestart]);
 
   /**
    * ポインターアンロック時（ESCキー押下時）のハンドラ
+   * BGM は一時停止して、戻ってきた時に重ねて再生されないようにする。
    */
   const handleUnlock = useCallback(() => {
+    Audio.bgm.stop();
     setIsLocked(false);
   }, []);
 
@@ -346,6 +526,8 @@ export default function App() {
         <DungeonScene
           dungeon={dungeon}
           onItemCollect={handleItemCollect}
+          onKeyCollect={handleKeyCollect}
+          heldKeys={heldKeys}
           isLocked={isLocked}
           items={items}
           collectedItemsRef={collectedItemsRef}
@@ -354,8 +536,11 @@ export default function App() {
           onExitReach={handleExitReach}
           playerPosRef={playerPosRef}
           exploredRef={exploredRef}
+          trailRef={trailRef}
           staminaRef={staminaRef}
           cameraYawRef={cameraYawRef}
+          closedDoorCellsRef={closedDoorCellsRef}
+          heldKeysRef={heldKeysRef}
         />
       </Canvas>
 
@@ -377,6 +562,12 @@ export default function App() {
         stamina={stamina}
         cleared={cleared}
         cameraYawRef={cameraYawRef}
+        bestTime={bestTime}
+        bestScore={bestScore}
+        newBestTime={newBestTime}
+        newBestScore={newBestScore}
+        difficulty={difficulty}
+        onDifficultyChange={handleDifficultyChange}
       />
 
       {/* ゲームプレイ中かつ未クリア時のみ、アイテム近接プロンプト[E]を表示 */}
@@ -389,8 +580,10 @@ export default function App() {
           dungeon={dungeon}
           playerPosRef={playerPosRef}
           exploredRef={exploredRef}
+          trailRef={trailRef}
           items={items}
           collectedItemsRef={collectedItemsRef}
+          heldKeys={heldKeys}
           exitActive={exitActive}
           cameraYawRef={cameraYawRef}
         />

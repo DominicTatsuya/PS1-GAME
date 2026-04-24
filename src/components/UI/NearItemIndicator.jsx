@@ -13,22 +13,28 @@
 /**
  * NearItemIndicator コンポーネント
  *
- * @param {Object|null} nearItem - 近くにあるアイテムの情報。null の場合は何も表示しない。
+ * @param {Object|null} nearItem - 近くにあるアイテムの情報。null なら非表示。
+ *        { kind: "item" | "key", id, position } 形式。kind によって表示を分岐する。
  * @returns {JSX.Element|null} プロンプトUI、または null
  */
 export default function NearItemIndicator({ nearItem }) {
   // nearItem が null（近くにアイテムがない）場合は何もレンダリングしない
   if (!nearItem) return null;
 
+  // 鍵と通常アイテムで表示色と文言を切り替える
+  const isKey = nearItem.kind === "key";
+  const label = isKey ? "[E] 鍵を取得" : "[E] アイテム取得";
+  const bg = isKey ? "rgba(68, 170, 255, 0.85)" : "rgba(255, 170, 0, 0.85)";
+
   return (
-    // 画面上部中央にオレンジ色のバッジとして表示
+    // 画面上部中央にバッジとして表示（色は種別で変わる）
     <div
       style={{
         position: "absolute",
         top: "50px",
         left: "50%",
         transform: "translateX(-50%)",       // 水平方向に中央揃え
-        background: "rgba(255, 170, 0, 0.85)", // 半透明のオレンジ背景
+        background: bg,                        // 種別に応じた色
         color: "#000",                         // 黒文字
         padding: "8px 20px",
         borderRadius: "2px",
@@ -42,7 +48,7 @@ export default function NearItemIndicator({ nearItem }) {
         textShadow: "none",                    // 親から継承されるtext-shadowを無効化
       }}
     >
-      [E] アイテム取得
+      {label}
     </div>
   );
 }

@@ -26,6 +26,15 @@ import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { checkGridCollision, worldToGrid } from "../systems/MapGenerator";
+import { PLAYER, ITEMS } from "../data/config";
+import { footstep } from "../systems/Audio";
+
+/**
+ * キーコードとキー名の対応表。
+ * KeyboardEvent.code（"KeyW" など）を内部で使うキー名（"w" など）に変換する。
+ * 不変な定数なのでコンポーネント外に定義し、useEffect の依存配列に載せなくて済むようにしている。
+ */
+const CODE_TO_KEY = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ShiftLeft: "shift", ShiftRight: "shift" };
 
 /**
  * PlayerController コンポーネント
@@ -44,7 +53,8 @@ import { checkGridCollision, worldToGrid } from "../systems/MapGenerator";
  */
 export default function PlayerController({
   isLocked, dungeon, onNearItem, items, collectedItemsRef,
-  onExitReach, exitActive, playerPosRef, exploredRef, staminaRef, cameraYawRef,
+  onExitReach, exitActive, playerPosRef, exploredRef, trailRef, staminaRef, cameraYawRef,
+  closedDoorCellsRef, heldKeysRef,
 }) {
   /**
    * useThree フック:
@@ -73,6 +83,8 @@ export default function PlayerController({
   const headBob = useRef(0);
   const initialized = useRef(false);
   const lanternRef = useRef();
+  // 足音の直近再生 headBob 値（同じ周期で 2 回鳴らないようにする）
+  const lastFootstepBob = useRef(0);
 
   /**
    * useEffect フック（カメラ初期位置の設定）:
@@ -90,12 +102,6 @@ export default function PlayerController({
   }, [dungeon, camera]);
 
   /**
-   * キーコードとキー名の対応表。
-   * KeyboardEvent.code（"KeyW" など）を内部で使うキー名（"w" など）に変換する。
-   */
-  const codeToKey = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ShiftLeft: "shift", ShiftRight: "shift" };
-
-  /**
    * useEffect フック（キーボードイベントの登録）:
    * キーが押された/離されたときのイベントリスナーを document に登録する。
    * canvas にフォーカスを当て（tabIndex 設定）、キー入力を確実に受け取れるようにする。
@@ -108,8 +114,8 @@ export default function PlayerController({
     const canvas = gl.domElement;
     canvas.tabIndex = 0;
     canvas.setAttribute("tabindex", "0");
-    const handleKeyDown = (e) => { const key = codeToKey[e.code]; if (key) { keys.current[key] = true; e.preventDefault(); } };
-    const handleKeyUp = (e) => { const key = codeToKey[e.code]; if (key) { keys.current[key] = false; e.preventDefault(); } };
+    const handleKeyDown = (e) => { const key = CODE_TO_KEY[e.code]; if (key) { keys.current[key] = true; e.preventDefault(); } };
+    const handleKeyUp = (e) => { const key = CODE_TO_KEY[e.code]; if (key) { keys.current[key] = false; e.preventDefault(); } };
     document.addEventListener("keydown", handleKeyDown, true);
     document.addEventListener("keyup", handleKeyUp, true);
     return () => { document.removeEventListener("keydown", handleKeyDown, true); document.removeEventListener("keyup", handleKeyUp, true); };
@@ -153,9 +159,9 @@ export default function PlayerController({
      * ダッシュ中はスタミナが減り、歩行中はスタミナが回復する。
      */
     const sprinting = keys.current.shift && staminaRef.current > 0 && direction.current.length() > 0;
-    const speed = sprinting ? 7.5 : 4.5;
-    if (sprinting) { staminaRef.current = Math.max(0, staminaRef.current - delta * 25); }
-    else { staminaRef.current = Math.min(100, staminaRef.current + delta * 15); }
+    const speed = sprinting ? PLAYER.SPRINT_SPEED : PLAYER.SPEED;
+    if (sprinting) { staminaRef.current = Math.max(0, staminaRef.current - delta * PLAYER.STAMINA_DRAIN); }
+    else { staminaRef.current = Math.min(PLAYER.STAMINA_MAX, staminaRef.current + delta * PLAYER.STAMINA_REGEN); }
 
     let moved = false;
 
@@ -188,20 +194,32 @@ export default function PlayerController({
        */
       const prevX = camera.position.x;
       const prevZ = camera.position.z;
+      // 閉じているドアのセル一覧（ref 経由で最新状態を参照）
+      const closedDoors = closedDoorCellsRef ? closedDoorCellsRef.current : null;
       const newPosX = camera.position.clone();
       newPosX.x += velocity.current.x;
-      if (!checkGridCollision(newPosX, grid, gridW, gridH, cellSize)) { camera.position.x = newPosX.x; }
+      if (!checkGridCollision(newPosX, grid, gridW, gridH, cellSize, undefined, closedDoors)) { camera.position.x = newPosX.x; }
       const newPosZ = camera.position.clone();
       newPosZ.z += velocity.current.z;
-      if (!checkGridCollision(newPosZ, grid, gridW, gridH, cellSize)) { camera.position.z = newPosZ.z; }
+      if (!checkGridCollision(newPosZ, grid, gridW, gridH, cellSize, undefined, closedDoors)) { camera.position.z = newPosZ.z; }
       moved = camera.position.x !== prevX || camera.position.z !== prevZ;
 
       /**
        * ヘッドボブ（頭の揺れ）:
        * 移動中にカウンターを増加させ、sin関数で上下に揺らすことで歩行感を演出。
        * ダッシュ時は揺れが速くなる（14 vs 9）。
+       *
+       * 足音は headBob が π の倍数（sin が底を打つ瞬間）で再生。
+       * 前回再生した位相を記録しておき、同じ周期で二重再生しないよう制御する。
        */
-      if (moved) { headBob.current += delta * (sprinting ? 14 : 9); }
+      if (moved) {
+        headBob.current += delta * (sprinting ? 14 : 9);
+        const stepPhase = Math.floor(headBob.current / Math.PI);
+        if (stepPhase > lastFootstepBob.current) {
+          lastFootstepBob.current = stepPhase;
+          footstep();
+        }
+      }
     }
 
     /**
@@ -211,7 +229,7 @@ export default function PlayerController({
      * Math.sin: 三角関数のサイン。-1～1の間を滑らかに振動する値を返す。
      */
     const bobAmount = moved ? Math.sin(headBob.current) * 0.04 : 0;
-    camera.position.y = 1.6 + bobAmount;
+    camera.position.y = PLAYER.HEIGHT + bobAmount;
 
     /**
      * ランタンの位置更新:
@@ -241,18 +259,48 @@ export default function PlayerController({
     if (exploredRef) {
       const { gx, gy } = worldToGrid(camera.position.x, camera.position.z, gridW, gridH, cellSize);
       for (let dy = -3; dy <= 3; dy++) { for (let dx = -3; dx <= 3; dx++) { const ex = gx + dx; const ey = gy + dy; if (ex >= 0 && ex < gridW && ey >= 0 && ey < gridH) { exploredRef.current.add(`${ex},${ey}`); } } }
+      // ブレッドクラム（軌跡）: プレイヤーが実際に立った中心セルだけを記録
+      if (trailRef) {
+        trailRef.current.add(`${gx},${gy}`);
+      }
     }
 
     /**
-     * 近くのアイテム検出:
-     * 全アイテムとプレイヤーの距離を計算し、2.5ユニット以内で最も近いアイテムを通知する。
-     * distanceTo: 2点間のユークリッド距離（直線距離）を計算するメソッド。
-     * Y座標はカメラと同じにして、水平方向の距離だけで判定している。
+     * 近くのアイテム/鍵の検出:
+     * 両方を同じ距離判定でチェックし、最近接のものを { kind, id, position } 形式で
+     * 親（App）に通知する。kind によって NearItemIndicator の表示色・文言が変わる。
      */
-    if (onNearItem && items) {
-      let closest = null; let minDist = Infinity;
+    if (onNearItem) {
+      let closest = null;
+      let minDist = Infinity;
       const collected = collectedItemsRef ? collectedItemsRef.current : null;
-      items.forEach((item) => { if (collected && collected.has(item.id)) return; const dist = camera.position.distanceTo(new THREE.Vector3(item.position[0], camera.position.y, item.position[2])); if (dist < 2.5 && dist < minDist) { minDist = dist; closest = item; } });
+      const heldKeys = heldKeysRef ? heldKeysRef.current : null;
+
+      if (items) {
+        items.forEach((item) => {
+          if (collected && collected.has(item.id)) return;
+          const dist = camera.position.distanceTo(
+            new THREE.Vector3(item.position[0], camera.position.y, item.position[2])
+          );
+          if (dist < ITEMS.COLLECT_DISTANCE && dist < minDist) {
+            minDist = dist;
+            closest = { kind: "item", id: item.id, position: item.position };
+          }
+        });
+      }
+
+      // 鍵の近接も同じ距離で判定
+      (dungeon.keys || []).forEach((k) => {
+        if (heldKeys && heldKeys.has(k.id)) return;
+        const dist = camera.position.distanceTo(
+          new THREE.Vector3(k.position[0], camera.position.y, k.position[2])
+        );
+        if (dist < ITEMS.COLLECT_DISTANCE && dist < minDist) {
+          minDist = dist;
+          closest = { kind: "key", id: k.id, position: k.position };
+        }
+      });
+
       onNearItem(closest);
     }
 

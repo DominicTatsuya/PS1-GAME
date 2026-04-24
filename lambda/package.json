@@ -1,0 +1,22 @@
+{
+  "name": "ps1-game-lambda",
+  "version": "1.0.0",
+  "description": "Score ranking backend for PS1-GAME",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --outfile=dist/handler.js --external:@aws-sdk/*",
+    "build:zip": "npm run build && cd dist && zip -r ../function.zip handler.js",
+    "typecheck": "tsc --noEmit",
+    "dev": "ts-node src/handler.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.0.0"
+  }
+}

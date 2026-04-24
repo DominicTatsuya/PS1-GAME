@@ -24,12 +24,14 @@ import { useRef, useEffect, useCallback, useState } from "react";
  * @param {Object} dungeon - ダンジョンデータ（grid, gridW, gridH, cellSize, exitGrid等）
  * @param {Object} playerPosRef - プレイヤー位置のref { x, z }
  * @param {Object} exploredRef - 探索済みセルの Set を保持するref
+ * @param {Object} trailRef - プレイヤー通過セルの Set を保持するref（ブレッドクラム）
  * @param {Array} items - アイテム一覧
  * @param {Object} collectedItemsRef - 収集済みアイテムIDの Set を保持するref
+ * @param {Set<string>} heldKeys - 取得済みの鍵 ID 集合（State）
  * @param {boolean} exitActive - 出口が有効かどうか（全アイテム収集後にtrue）
  * @param {Object} cameraYawRef - カメラのヨー角（水平回転角度）のref
  */
-export default function Minimap({ dungeon, playerPosRef, exploredRef, items, collectedItemsRef, exitActive, cameraYawRef }) {
+export default function Minimap({ dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, exitActive, cameraYawRef }) {
   // canvas DOM要素への参照
   const canvasRef = useRef();
 
@@ -110,6 +112,18 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, items, col
       }
     }
 
+    // ===== ブレッドクラム（軌跡）の描画 =====
+    // プレイヤーが実際に立ったセルを半透明の水色でオーバーレイする
+    // 通路の上に乗るので、通路色（#1a1815）が透けて「歩いた跡」に見える
+    const trail = trailRef ? trailRef.current : null;
+    if (trail && trail.size > 0) {
+      ctx.fillStyle = "rgba(0, 204, 255, 0.22)";
+      for (const key of trail) {
+        const [tx, ty] = key.split(",").map(Number);
+        ctx.fillRect(tx * scale, ty * scale, scale, scale);
+      }
+    }
+
     // ===== ワールド座標 → グリッド座標への変換用オフセット =====
     // ダンジョンの中心がワールド原点(0,0)になるように配置されているため、
     // グリッド座標に変換するにはオフセットを加算する必要がある
@@ -133,6 +147,25 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, items, col
       // 拡大表示時はセルより少し小さく描画（マージンを付ける）
       const s = expanded ? scale - 2 : scale;
       ctx.fillRect(ix * scale + (expanded ? 1 : 0), iy * scale + (expanded ? 1 : 0), s, s);
+    });
+
+    // ===== 鍵の描画 =====
+    // 未取得の鍵を青色四角で表示（探索済みセルのみ）
+    (dungeon.keys || []).forEach((key) => {
+      if (heldKeys && heldKeys.has(key.id)) return;
+      if (!explored.has(`${key.gx},${key.gy}`)) return;
+      ctx.fillStyle = "#44aaff";  // 青色（鍵の色）
+      const s = expanded ? scale - 2 : scale;
+      ctx.fillRect(key.gx * scale + (expanded ? 1 : 0), key.gy * scale + (expanded ? 1 : 0), s, s);
+    });
+
+    // ===== ドアの描画 =====
+    // 閉じているドアは茶色、開いているドア（対応鍵を所持）は薄い色で表示
+    (dungeon.doors || []).forEach((door) => {
+      if (!explored.has(`${door.gx},${door.gy}`)) return;
+      const isOpen = heldKeys && heldKeys.has(door.keyId);
+      ctx.fillStyle = isOpen ? "rgba(120,90,50,0.4)" : "#8b5a2b";
+      ctx.fillRect(door.gx * scale, door.gy * scale, scale, scale);
     });
 
     // ===== 出口の描画 =====
@@ -199,7 +232,7 @@ export default function Minimap({ dungeon, playerPosRef, exploredRef, items, col
     // 次フレームでも draw を呼び出す（ループ）
     // requestAnimationFrame はブラウザの描画タイミングに合わせて実行される（通常60fps）
     animRef.current = requestAnimationFrame(draw);
-  }, [dungeon, playerPosRef, exploredRef, items, exitActive, cameraYawRef, grid, gridW, gridH, cellSize, scale, expanded]);
+  }, [dungeon, playerPosRef, exploredRef, trailRef, items, collectedItemsRef, heldKeys, exitActive, cameraYawRef, grid, gridW, gridH, cellSize, scale, expanded]);
 
   // ===== アニメーションループの開始と停止 =====
   useEffect(() => {

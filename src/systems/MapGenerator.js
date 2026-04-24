@@ -21,6 +21,8 @@
  * ============================================================
  */
 
+import { MAZE, ITEMS, TORCH, PLAYER } from "../data/config";
+
 /**
  * mulberry32(a)
  * ─────────────
@@ -304,6 +306,64 @@ export function bfsFarthest(grid, startGx, startGy) {
 }
 
 /**
+ * bfsShortestPath(grid, start, goal)
+ * ─────────────────────────────────
+ * 通路グリッド上で、2 点間の最短経路（セル列）を返す。
+ * 到達不能なら空配列を返す。
+ *
+ * ドア配置のために、スタートから出口への経路中のセルを特定するのに使う。
+ *
+ * @param {number[][]} grid
+ * @param {{ gx: number, gy: number }} start
+ * @param {{ gx: number, gy: number }} goal
+ * @returns {{ gx: number, gy: number }[]} — start から goal までのセル列（両端含む）
+ */
+export function bfsShortestPath(grid, start, goal) {
+  const key = (x, y) => `${x},${y}`;
+  const parent = new Map(); // key -> parent key
+  const visited = new Set();
+  const startKey = key(start.gx, start.gy);
+  const goalKey = key(goal.gx, goal.gy);
+  visited.add(startKey);
+  parent.set(startKey, null);
+
+  const queue = [startKey];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur === goalKey) break;
+    const [cx, cy] = cur.split(",").map(Number);
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      const k = key(nx, ny);
+      if (
+        nx >= 0 && nx < grid[0].length &&
+        ny >= 0 && ny < grid.length &&
+        grid[ny][nx] === 0 &&
+        !visited.has(k)
+      ) {
+        visited.add(k);
+        parent.set(k, cur);
+        queue.push(k);
+      }
+    }
+  }
+
+  if (!parent.has(goalKey)) return [];
+
+  // 経路を逆順にたどって並び替える
+  const path = [];
+  let cur = goalKey;
+  while (cur !== null) {
+    const [gx, gy] = cur.split(",").map(Number);
+    path.push({ gx, gy });
+    cur = parent.get(cur);
+  }
+  path.reverse();
+  return path;
+}
+
+/**
  * checkGridCollision(position, grid, gridW, gridH, cellSize, radius)
  * ───────────────────────────────────────────────────────────────────
  * プレイヤーの位置が壁と衝突しているかを判定する関数。
@@ -322,10 +382,12 @@ export function bfsFarthest(grid, startGx, startGy) {
  * @param {number} gridW — グリッド幅
  * @param {number} gridH — グリッド高さ
  * @param {number} cellSize — 1 セルのサイズ
- * @param {number} radius — プレイヤーの衝突半径（デフォルト: 0.35）
+ * @param {number} radius — プレイヤーの衝突半径（デフォルト: PLAYER.COLLISION_RADIUS）
+ * @param {Set<string>} [closedDoorCells] — 閉じているドアのセル集合（"gx,gy" 形式）。
+ *        ここに登録されたセルは通路（grid=0）でも壁として衝突する。
  * @returns {boolean} — 衝突していれば true
  */
-export function checkGridCollision(position, grid, gridW, gridH, cellSize, radius = 0.35) {
+export function checkGridCollision(position, grid, gridW, gridH, cellSize, radius = PLAYER.COLLISION_RADIUS, closedDoorCells = null) {
   // プレイヤー位置をグリッド座標（浮動小数点）に変換
   const offsetX = (gridW * cellSize) / 2;
   const offsetZ = (gridH * cellSize) / 2;
@@ -341,8 +403,10 @@ export function checkGridCollision(position, grid, gridW, gridH, cellSize, radiu
 
       // グリッド範囲外はスキップ
       if (cx < 0 || cx >= gridW || cz < 0 || cz >= gridH) continue;
-      // 壁（1）でなければスキップ
-      if (grid[cz][cx] !== 1) continue;
+      // 壁（1）でなければスキップ（ただし閉じているドアは通路でも障害物になる）
+      const isWall = grid[cz][cx] === 1;
+      const isClosedDoor = closedDoorCells !== null && closedDoorCells.has(`${cx},${cz}`);
+      if (!isWall && !isClosedDoor) continue;
 
       // 壁セルのワールド座標での範囲（AABB: 最小値〜最大値）
       const wallMinX = cx * cellSize - offsetX;
@@ -385,11 +449,11 @@ export function checkGridCollision(position, grid, gridW, gridH, cellSize, radiu
  * @returns {Object} — ダンジョンデータ一式
  */
 export function generateDungeon(seed = Date.now()) {
-  // ─── 基本パラメータ ───
-  const MAZE_W = 10;        // 迷路の幅（セル数）
-  const MAZE_H = 10;        // 迷路の高さ（セル数）
-  const CELL_SIZE = 2.0;    // 1 セルのワールドサイズ（メートル相当）
-  const WALL_HEIGHT = 3.5;  // 壁の高さ（メートル相当）
+  // ─── 基本パラメータ（config.js の MAZE / ITEMS / TORCH を参照） ───
+  const MAZE_W = MAZE.WIDTH;        // 迷路の幅（セル数）
+  const MAZE_H = MAZE.HEIGHT;       // 迷路の高さ（セル数）
+  const CELL_SIZE = MAZE.CELL_SIZE; // 1 セルのワールドサイズ（メートル相当）
+  const WALL_HEIGHT = MAZE.WALL_HEIGHT; // 壁の高さ（メートル相当）
 
   // ─── 迷路を生成 ───
   const maze = generateMaze(MAZE_W, MAZE_H, seed);
@@ -408,20 +472,20 @@ export function generateDungeon(seed = Date.now()) {
   const deadEnds = findDeadEnds(grid);
   const junctions = findJunctions(grid);
 
-  // ─── アイテム配置（最大 5 個） ───
+  // ─── アイテム配置（ITEMS.COUNT 個まで） ───
   // 優先的に行き止まりに配置（スタートと出口は除外）
   const itemCandidates = deadEnds
     .filter((e) => !(e.gx === startGx && e.gy === startGy) && !(e.gx === farthest.x && e.gy === farthest.y))
     .sort(() => 0.5 - mulberry32(seed + 42)()); // シード付きでシャッフル
 
-  const items = itemCandidates.slice(0, Math.min(5, itemCandidates.length)).map((e, i) => {
+  const items = itemCandidates.slice(0, Math.min(ITEMS.COUNT, itemCandidates.length)).map((e, i) => {
     const pos = gridToWorld(e.gx, e.gy, gridW, gridH, CELL_SIZE);
     // position は [x, y, z] の配列。y=1.0 はアイテムの高さ（床からの距離）
     return { id: `item_${i}`, position: [pos.x, 1.0, pos.z], gx: e.gx, gy: e.gy };
   });
 
-  // 行き止まりだけでは 5 個に足りない場合、通路セルからも補充
-  if (items.length < 5) {
+  // 行き止まりだけでは ITEMS.COUNT に足りない場合、通路セルからも補充
+  if (items.length < ITEMS.COUNT) {
     const openCells = [];
     for (let y = 1; y < gridH - 1; y += 2) {
       for (let x = 1; x < gridW - 1; x += 2) {
@@ -435,7 +499,7 @@ export function generateDungeon(seed = Date.now()) {
     }
     const rng2 = mulberry32(seed + 99);
     openCells.sort(() => 0.5 - rng2()); // シャッフル
-    while (items.length < 5 && openCells.length > 0) {
+    while (items.length < ITEMS.COUNT && openCells.length > 0) {
       const cell = openCells.pop();
       const pos = gridToWorld(cell.gx, cell.gy, gridW, gridH, CELL_SIZE);
       items.push({ id: `item_${items.length}`, position: [pos.x, 1.0, pos.z], gx: cell.gx, gy: cell.gy });
@@ -462,7 +526,7 @@ export function generateDungeon(seed = Date.now()) {
   const torchCandidates = [
     ...junctions,
     ...deadEnds,
-    ...corridorCells.filter(() => rng3() < 0.3),
+    ...corridorCells.filter(() => rng3() < TORCH.CORRIDOR_CHANCE),
   ];
   torchCandidates.sort(() => 0.5 - rng3());
 
@@ -481,7 +545,7 @@ export function generateDungeon(seed = Date.now()) {
 
   // 各松明について隣接する壁の方向を検出し、壁面に配置
   // wallDir: 松明が取り付けられる壁の方向（松明は壁から通路側に突き出す）
-  const torches = filteredCandidates.slice(0, Math.min(25, filteredCandidates.length)).map((t) => {
+  const torches = filteredCandidates.slice(0, Math.min(TORCH.MAX_COUNT, filteredCandidates.length)).map((t) => {
     const pos = gridToWorld(t.gx, t.gy, gridW, gridH, CELL_SIZE);
 
     // 隣接セルのうち壁であるものを探す（松明を取り付ける壁面）
@@ -515,6 +579,85 @@ export function generateDungeon(seed = Date.now()) {
     }
   }
 
+  // ─── ドア・鍵の配置 ───
+  // スタート → 出口 の最短経路を復元し、その経路上のセルから
+  // 「出口寄りかつ、既存のアイテム/スタート/出口と被らない」セルをドアとして 1 つ選ぶ。
+  // 鍵は「経路から外れたデッドエンド」に置く（プレイヤーが寄り道を強いられる設計）。
+  const doors = [];
+  const keys = [];
+  const path = bfsShortestPath(
+    grid,
+    { gx: startGx, gy: startGy },
+    { gx: farthest.x, gy: farthest.y }
+  );
+
+  if (path.length >= 5) {
+    // 出口側 1/3 あたりからドア候補を探す（スタート直後にドアがあるとすぐ詰まる）
+    const doorSearchStart = Math.floor((path.length * 2) / 3);
+    const occupied = new Set([
+      `${startGx},${startGy}`,
+      `${farthest.x},${farthest.y}`,
+      ...items.map((it) => `${it.gx},${it.gy}`),
+    ]);
+    let doorCell = null;
+    for (let i = doorSearchStart; i < path.length - 1; i++) {
+      const cell = path[i];
+      if (!occupied.has(`${cell.gx},${cell.gy}`)) {
+        doorCell = cell;
+        break;
+      }
+    }
+
+    if (doorCell) {
+      const pos = gridToWorld(doorCell.gx, doorCell.gy, gridW, gridH, CELL_SIZE);
+      doors.push({
+        id: "door_0",
+        gx: doorCell.gx,
+        gy: doorCell.gy,
+        position: [pos.x, 0, pos.z],
+        keyId: "key_0",
+      });
+      occupied.add(`${doorCell.gx},${doorCell.gy}`);
+
+      // 鍵の配置: 経路外のデッドエンドを優先。無ければ経路外の通路セル。
+      const pathSet = new Set(path.map((c) => `${c.gx},${c.gy}`));
+      const offPathDeadEnds = deadEnds.filter(
+        (e) => !pathSet.has(`${e.gx},${e.gy}`) && !occupied.has(`${e.gx},${e.gy}`)
+      );
+      const rngKey = mulberry32(seed + 123);
+      offPathDeadEnds.sort(() => 0.5 - rngKey());
+      let keyCell = offPathDeadEnds[0] || null;
+
+      if (!keyCell) {
+        // 経路外の通路セルから選ぶ
+        for (let y = 1; y < gridH - 1; y += 2) {
+          for (let x = 1; x < gridW - 1; x += 2) {
+            if (grid[y][x] === 0 && !pathSet.has(`${x},${y}`) && !occupied.has(`${x},${y}`)) {
+              keyCell = { gx: x, gy: y };
+              break;
+            }
+          }
+          if (keyCell) break;
+        }
+      }
+
+      if (keyCell) {
+        const keyPos = gridToWorld(keyCell.gx, keyCell.gy, gridW, gridH, CELL_SIZE);
+        keys.push({
+          id: "key_0",
+          gx: keyCell.gx,
+          gy: keyCell.gy,
+          position: [keyPos.x, 1.0, keyPos.z],
+          opensDoorId: "door_0",
+        });
+      } else {
+        // 鍵の置き場所が見つからない（非常に小さい迷路など）場合は
+        // ドアも無しにして一貫性を保つ
+        doors.length = 0;
+      }
+    }
+  }
+
   // ─── ダンジョンデータを返す ───
   return {
     grid,                // 迷路の 2D 配列（0=通路, 1=壁）
@@ -522,12 +665,14 @@ export function generateDungeon(seed = Date.now()) {
     gridH,               // グリッド高さ
     cellSize: CELL_SIZE, // 1 セルのワールドサイズ
     wallHeight: WALL_HEIGHT, // 壁の高さ
-    startPos: { x: startPos.x, y: 1.6, z: startPos.z }, // スタート位置（y=1.6 はプレイヤーの目の高さ）
+    startPos: { x: startPos.x, y: PLAYER.HEIGHT, z: startPos.z }, // スタート位置（y はプレイヤーの目の高さ）
     exitPos: { x: exitPos.x, y: 0, z: exitPos.z },      // 出口位置（y=0 は床の高さ）
     exitGrid: { gx: farthest.x, gy: farthest.y },       // 出口のグリッド座標
     items,               // 収集アイテムの配列
     torches,             // たいまつの座標配列
     wallPositions,       // 壁のワールド座標配列
+    doors,               // ドア配列 [{id, gx, gy, position, keyId}]
+    keys,                // 鍵配列 [{id, gx, gy, position, opensDoorId}]
     seed,                // 使用したシード値（再現用）
   };
 }

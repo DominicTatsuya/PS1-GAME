@@ -43,6 +43,7 @@ export default function DungeonWalls({ wallPositions, cellSize, wallHeight }) {
    * useMemo は計算コストの高い処理の結果をキャッシュ（メモ化）するフック。
    * 依存配列 [count] の値が変わらない限り、再計算されない。
    *
+   *
    * ここでは各壁ブロックにわずかな色の違いを与え、単調さを解消している。
    * - Float32Array: 型付き配列。count × 3（RGB各成分）のバッファを作成。
    * - Math.sin(i * 13.37): 壁のインデックスごとに擬似ランダムな値を生成。

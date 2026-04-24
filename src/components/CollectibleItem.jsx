@@ -20,6 +20,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { ITEMS } from "../data/config";
 
 /**
  * CollectibleItem コンポーネント
@@ -77,7 +78,7 @@ export default function CollectibleItem({ position, onCollect, id }) {
      */
     const distance = camera.position.distanceTo(new THREE.Vector3(meshRef.current.position.x, camera.position.y, meshRef.current.position.z));
 
-    if (distance < 2.5) {
+    if (distance < ITEMS.COLLECT_DISTANCE) {
       /**
        * 脈動アニメーション:
        * sin(t * 6) で高速に -1～1 を振動 → 0.75～1.25 のスケール変化。
@@ -108,7 +109,7 @@ export default function CollectibleItem({ position, onCollect, id }) {
     const handleKeyPress = (e) => {
       if (e.key.toLowerCase() !== "e" || !meshRef.current) return;
       const distance = camera.position.distanceTo(new THREE.Vector3(meshRef.current.position.x, camera.position.y, meshRef.current.position.z));
-      if (distance < 2.5) { setCollected(true); onCollect(id); }
+      if (distance < ITEMS.COLLECT_DISTANCE) { setCollected(true); onCollect(id); }
     };
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);

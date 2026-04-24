@@ -15,6 +15,8 @@
  */
 
 import { useRef, useEffect, useState } from "react";
+import { SCORING, PLAYER, DIFFICULTIES, DIFFICULTY_LABELS } from "../../data/config";
+import * as Audio from "../../systems/Audio";
 
 /**
  * Compass コンポーネント（内部コンポーネント）
@@ -156,8 +158,50 @@ function Compass({ cameraYawRef }) {
  * @param {number} stamina - 現在のスタミナ（0～100）
  * @param {boolean} cleared - クリア状態
  * @param {Object} cameraYawRef - カメラのヨー角のref（コンパスに渡す）
+ * @param {number | null} bestTime - localStorage 保存のベストタイム（秒）。未記録なら null
+ * @param {number | null} bestScore - localStorage 保存のベストスコア。未記録なら null
+ * @param {boolean} newBestTime - 今回のクリアで新ベストタイムになったか
+ * @param {boolean} newBestScore - 今回のクリアで新ベストスコアになったか
+ * @param {"easy" | "normal" | "hard"} difficulty - 現在選択中の難易度
+ * @param {Function} onDifficultyChange - 難易度選択変更時のハンドラ
  */
-export default function GameUI({ score, itemCount, totalItems, isLocked, elapsedTime, stamina, cleared, cameraYawRef }) {
+export default function GameUI({
+  score,
+  itemCount,
+  totalItems,
+  isLocked,
+  elapsedTime,
+  stamina,
+  cleared,
+  cameraYawRef,
+  bestTime = null,
+  bestScore = null,
+  newBestTime = false,
+  newBestScore = false,
+  difficulty = "normal",
+  onDifficultyChange = () => {},
+}) {
+  // ===== 音量設定（Audio モジュールと同期） =====
+  // Audio モジュールがソース・オブ・トゥルース。UI 表示用に state にミラー。
+  const [sfxVolume, setSfxVolume] = useState(() => Audio.getSfxVolume());
+  const [bgmVolume, setBgmVolume] = useState(() => Audio.getBgmVolume());
+  const [muted, setMuted] = useState(() => Audio.isMuted());
+
+  const onSfxChange = (e) => {
+    const v = Number(e.target.value);
+    setSfxVolume(v);
+    Audio.setSfxVolume(v);
+  };
+  const onBgmChange = (e) => {
+    const v = Number(e.target.value);
+    setBgmVolume(v);
+    Audio.setBgmVolume(v);
+  };
+  const onToggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    Audio.setMuted(next);
+  };
   /**
    * 時間を "MM:SS" 形式にフォーマットする関数
    * @param {number} s - 秒数
@@ -170,11 +214,11 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
     return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
-  // ===== スコア計算 =====
-  // タイムボーナス: 300秒以内にクリアすると残り秒数がボーナスに（最低0点）
-  const timeBonus = Math.max(0, 300 - Math.floor(elapsedTime));
-  // 最終スコア: 基本スコア + （クリア時のみ）タイムボーナス + クリアボーナス50点
-  const finalScore = score + (cleared ? timeBonus + 50 : 0);
+  // ===== スコア計算（config.js の SCORING を参照） =====
+  // タイムボーナス: SCORING.TIME_BONUS_BASE 秒以内にクリアすると残り秒数がボーナスに（最低0点）
+  const timeBonus = Math.max(0, SCORING.TIME_BONUS_BASE - Math.floor(elapsedTime));
+  // 最終スコア: 基本スコア + （クリア時のみ）タイムボーナス + SCORING.CLEAR_BONUS
+  const finalScore = score + (cleared ? timeBonus + SCORING.CLEAR_BONUS : 0);
 
   return (
     // UI全体のコンテナ。画面全体に広がり、3Dシーンの上に重なる。
@@ -256,6 +300,94 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
             </div>
           </div>
 
+          {/* ===== 難易度選択 ===== */}
+          <div style={{ margin: "15px 0 10px" }}>
+            <div style={{ fontSize: "11px", color: "#887755", marginBottom: "6px", letterSpacing: "2px" }}>
+              DIFFICULTY
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "6px",
+                pointerEvents: "auto",
+              }}
+            >
+              {DIFFICULTIES.map((d) => {
+                const selected = d === difficulty;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => onDifficultyChange(d)}
+                    style={{
+                      flex: "1 1 0",
+                      padding: "6px 10px",
+                      fontSize: "12px",
+                      fontFamily: "'Courier New', monospace",
+                      letterSpacing: "1px",
+                      cursor: "pointer",
+                      background: selected ? "rgba(255,170,0,0.25)" : "rgba(255,255,255,0.05)",
+                      color: selected ? "#ffaa00" : "#bba880",
+                      border: `1px solid ${selected ? "#ffaa00" : "rgba(255,170,0,0.2)"}`,
+                      borderRadius: "2px",
+                    }}
+                  >
+                    {DIFFICULTY_LABELS[d]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ===== 音量設定 =====
+              Audio モジュールに書き込み、値は localStorage に自動保存される */}
+          <div style={{ margin: "10px 0" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "6px",
+                pointerEvents: "auto",
+              }}
+            >
+              <span style={{ fontSize: "11px", color: "#887755", letterSpacing: "2px" }}>AUDIO</span>
+              <button
+                type="button"
+                onClick={onToggleMute}
+                style={{
+                  padding: "3px 8px",
+                  fontSize: "10px",
+                  fontFamily: "'Courier New', monospace",
+                  cursor: "pointer",
+                  background: muted ? "rgba(255,68,68,0.2)" : "rgba(255,255,255,0.05)",
+                  color: muted ? "#ff4444" : "#bba880",
+                  border: `1px solid ${muted ? "#ff4444" : "rgba(255,170,0,0.2)"}`,
+                  borderRadius: "2px",
+                }}
+              >
+                {muted ? "MUTED" : "MUTE"}
+              </button>
+            </div>
+            <div style={volumeRowStyle}>
+              <span style={volumeLabelStyle}>SFX</span>
+              <input
+                type="range" min="0" max="1" step="0.05" value={sfxVolume}
+                onChange={onSfxChange}
+                style={volumeInputStyle}
+              />
+            </div>
+            <div style={volumeRowStyle}>
+              <span style={volumeLabelStyle}>BGM</span>
+              <input
+                type="range" min="0" max="1" step="0.05" value={bgmVolume}
+                onChange={onBgmChange}
+                style={volumeInputStyle}
+              />
+            </div>
+          </div>
+
           {/* ミッション説明 */}
           <p style={{ margin: "15px 0 5px", fontSize: "13px", color: "#ffaa00" }}>
             ダンジョン内のアイテムを全て集め
@@ -263,6 +395,35 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
           <p style={{ margin: "0 0 15px", fontSize: "13px", color: "#ffaa00" }}>
             出口を見つけて脱出せよ
           </p>
+
+          {/* ===== ベスト記録（ベストが存在する時のみ表示） =====
+              localStorage から読み取った過去最高記録をスタート画面に表示する */}
+          {(bestTime !== null || bestScore !== null) && (
+            <div
+              style={{
+                margin: "20px 0 10px",
+                padding: "10px 12px",
+                background: "rgba(68,170,255,0.08)",
+                border: "1px solid rgba(68,170,255,0.25)",
+                borderRadius: "2px",
+                fontSize: "12px",
+                color: "#88bbff",
+                letterSpacing: "1px",
+              }}
+            >
+              <div style={{ color: "#44aaff", marginBottom: "4px", fontSize: "11px" }}>BEST RECORD</div>
+              {bestTime !== null && (
+                <div>
+                  TIME <span style={{ color: "#fff", marginLeft: "10px" }}>{formatTime(bestTime)}</span>
+                </div>
+              )}
+              {bestScore !== null && (
+                <div>
+                  SCORE <span style={{ color: "#fff", marginLeft: "10px" }}>{bestScore}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ゲーム開始プロンプト */}
           <p style={{ margin: "10px 0 0", fontSize: "16px", color: "#fff", opacity: 0.7, letterSpacing: "2px" }}>
@@ -335,13 +496,18 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
                 overflow: "hidden",
               }}
             >
-              {/* バーの中身（width を stamina% で動的に変化） */}
+              {/* バーの中身（現在値を STAMINA_MAX に対する百分率で動的に変化） */}
               <div
                 style={{
-                  width: `${stamina}%`,
+                  width: `${(stamina / PLAYER.STAMINA_MAX) * 100}%`,
                   height: "100%",
-                  // 三項演算子でスタミナ量に応じて色を分岐
-                  background: stamina > 30 ? "#44aaff" : stamina > 10 ? "#ffaa00" : "#ff4444",
+                  // 三項演算子でスタミナ量に応じて色を分岐（STAMINA_MAX の 30% / 10% 閾値）
+                  background:
+                    stamina > PLAYER.STAMINA_MAX * 0.3
+                      ? "#44aaff"
+                      : stamina > PLAYER.STAMINA_MAX * 0.1
+                      ? "#ffaa00"
+                      : "#ff4444",
                   transition: "width 0.1s",
                   borderRadius: "2px",
                 }}
@@ -439,13 +605,13 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
                 {itemCount}/{totalItems}
               </span>
             </div>
-            {/* タイムボーナス: 300秒からの残り秒数 */}
+            {/* タイムボーナス: SCORING.TIME_BONUS_BASE 秒からの残り秒数 */}
             <div>
               TIME BONUS <span style={{ color: "#44aaff", marginLeft: "10px" }}>{timeBonus}</span>
             </div>
-            {/* クリアボーナス: 固定50点 */}
+            {/* クリアボーナス: SCORING.CLEAR_BONUS 点 */}
             <div>
-              CLEAR BONUS <span style={{ color: "#44aaff", marginLeft: "10px" }}>50</span>
+              CLEAR BONUS <span style={{ color: "#44aaff", marginLeft: "10px" }}>{SCORING.CLEAR_BONUS}</span>
             </div>
           </div>
 
@@ -460,6 +626,51 @@ export default function GameUI({ score, itemCount, totalItems, isLocked, elapsed
           >
             TOTAL {finalScore}
           </div>
+
+          {/* ===== 新記録演出 =====
+              localStorage の記録が更新された場合のみ表示 */}
+          {(newBestTime || newBestScore) && (
+            <div
+              style={{
+                margin: "15px 0 5px",
+                padding: "8px",
+                color: "#ffee44",
+                fontSize: "15px",
+                letterSpacing: "3px",
+                textShadow: "0 0 10px rgba(255,238,68,0.6)",
+                animation: "none",
+              }}
+            >
+              ★ NEW {newBestTime && newBestScore
+                ? "BEST TIME & SCORE"
+                : newBestTime
+                ? "BEST TIME"
+                : "BEST SCORE"} ★
+            </div>
+          )}
+
+          {/* ===== ベスト記録の表示 ===== */}
+          {(bestTime !== null || bestScore !== null) && (
+            <div
+              style={{
+                margin: "10px 0",
+                fontSize: "12px",
+                color: "#88bbff",
+                letterSpacing: "1px",
+              }}
+            >
+              {bestTime !== null && (
+                <span style={{ marginRight: "15px" }}>
+                  BEST TIME <span style={{ color: "#fff", marginLeft: "6px" }}>{formatTime(bestTime)}</span>
+                </span>
+              )}
+              {bestScore !== null && (
+                <span>
+                  BEST SCORE <span style={{ color: "#fff", marginLeft: "6px" }}>{bestScore}</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* 再挑戦プロンプト（クリックするとhandleLock → handleRestart が実行される） */}
           <p style={{ margin: "20px 0 0", fontSize: "13px", color: "#666", letterSpacing: "1px" }}>
@@ -489,4 +700,28 @@ const keyStyle = {
   fontWeight: "bold",
   textAlign: "right",
   marginRight: "10px",
+};
+
+/** 音量スライダ 1 行のレイアウト */
+const volumeRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  margin: "4px 0",
+  pointerEvents: "auto",
+};
+
+/** 音量スライダの左側ラベル */
+const volumeLabelStyle = {
+  minWidth: "36px",
+  fontSize: "11px",
+  color: "#bba880",
+  letterSpacing: "1px",
+};
+
+/** 音量スライダ入力の基本スタイル */
+const volumeInputStyle = {
+  flex: "1 1 0",
+  accentColor: "#ffaa00",
+  cursor: "pointer",
 };

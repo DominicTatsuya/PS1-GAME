@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+lambda/dist/
+lambda/function.zip
+lambda/node_modules/

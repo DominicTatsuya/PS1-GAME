@@ -4,12 +4,21 @@
  * ============================================================
  *
  * ゲーム内で使われる数値パラメータを一箇所に集約しています。
- * ここを変更するだけでゲームバランスの調整ができます。
  *
  * なぜ定数をまとめるのか？
  *   - マジックナンバー（コード中に直接書かれた数値）を避けられる
  *   - バランス調整時に 1 ファイルだけ変更すれば済む
  *   - 定数の意味がコード中で明確になる
+ *
+ * ─── 難易度対応 ───
+ * このファイルは Normal（標準難易度）の値を export しつつ、
+ * `DIFFICULTY_PRESETS` に他難易度とのオーバーライドを定義しています。
+ * `applyDifficulty(difficulty)` を呼ぶと、該当難易度の値で
+ * `MAZE` / `ITEMS` / `TORCH` / `PLAYER` を上書きします。
+ *
+ * これにより、既存コードの `import { MAZE } from "../data/config"` を
+ * 書き換えずに難易度切替が機能します（同じオブジェクト参照を
+ * 書き換えるため、import 側は常に最新値を見る）。
  *
  * 各セクション:
  *   MAZE    — 迷路の構造に関する定数
@@ -91,3 +100,75 @@ export const TORCH = {
   MAX_COUNT: 30,         // たいまつの最大配置数
   CORRIDOR_CHANCE: 0.3,  // 通路へのたいまつ配置確率（30%）
 };
+
+// ============================================================
+// 難易度プリセット
+// ============================================================
+
+/** 利用可能な難易度の ID 一覧（UI の選択順にもなる） */
+export const DIFFICULTIES = ["easy", "normal", "hard"];
+
+/** UI に表示するラベル */
+export const DIFFICULTY_LABELS = {
+  easy: "EASY",
+  normal: "NORMAL",
+  hard: "HARD",
+};
+
+/**
+ * 難易度ごとの上書き値。未定義のキーは基本値（上記 export 群）が使われる。
+ *
+ * - EASY:   迷路が小さく、松明が多い。スタミナ多め。
+ * - NORMAL: 標準（= 基本値）。変更なし。
+ * - HARD:   迷路が大きく、アイテム数多め、松明少なめ。スタミナ減少早め。
+ */
+const DIFFICULTY_PRESETS = {
+  easy: {
+    MAZE: { WIDTH: 7, HEIGHT: 7 },
+    ITEMS: { COUNT: 3 },
+    TORCH: { MAX_COUNT: 30, CORRIDOR_CHANCE: 0.5 },
+    PLAYER: { STAMINA_MAX: 130, STAMINA_REGEN: 20 },
+  },
+  normal: {},
+  hard: {
+    MAZE: { WIDTH: 13, HEIGHT: 13 },
+    ITEMS: { COUNT: 7 },
+    TORCH: { MAX_COUNT: 20, CORRIDOR_CHANCE: 0.15 },
+    PLAYER: { STAMINA_MAX: 70, STAMINA_DRAIN: 35 },
+  },
+};
+
+// 基本値（Normal 相当）の控え。applyDifficulty で戻すときに使う。
+// 難易度切替で同じオブジェクトを書き換えるため、初期値を構造コピーで保持しておく。
+const BASE_SNAPSHOT = {
+  MAZE: { ...MAZE },
+  ITEMS: { ...ITEMS },
+  TORCH: { ...TORCH },
+  PLAYER: { ...PLAYER },
+};
+
+/**
+ * 既存の MAZE / ITEMS / TORCH / PLAYER オブジェクトの *中身* を、
+ * 指定難易度の値で書き換える（参照は変えない）。
+ *
+ * オブジェクト参照を保つことで、既存の import 先は書き換えなくても
+ * 最新の値を読める。React 側で useMemo の依存に入れる場合は、
+ * 難易度が変わった事を別途シードやリセットで伝える必要がある。
+ *
+ * @param {"easy" | "normal" | "hard"} difficulty
+ */
+export function applyDifficulty(difficulty) {
+  // まず基本値に戻す（前回の難易度の残留を消す）
+  Object.assign(MAZE, BASE_SNAPSHOT.MAZE);
+  Object.assign(ITEMS, BASE_SNAPSHOT.ITEMS);
+  Object.assign(TORCH, BASE_SNAPSHOT.TORCH);
+  Object.assign(PLAYER, BASE_SNAPSHOT.PLAYER);
+
+  const preset = DIFFICULTY_PRESETS[difficulty];
+  if (!preset) return;
+
+  if (preset.MAZE) Object.assign(MAZE, preset.MAZE);
+  if (preset.ITEMS) Object.assign(ITEMS, preset.ITEMS);
+  if (preset.TORCH) Object.assign(TORCH, preset.TORCH);
+  if (preset.PLAYER) Object.assign(PLAYER, preset.PLAYER);
+}
