@@ -1,0 +1,84 @@
+{
+  "_comment_purpose": "プロジェクト固有の Claude Code 設定。 user-level の ~/.claude/settings.json と合成されます。",
+  "_comment_policy": "ロールポリシー: ファイル編集と dev/test/lint/build は Claude が担う。 git の変更系（add/commit/push/merge/rebase 等）と PR 作成・マージ・リリースは必ずユーザが行う。 deny ルールはこの分離を明示的に強制します。",
+  "_comment_handoff": "セッション開始時の動線は CLAUDE.md の「セッション開始時の動線」を参照。",
+
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run lint -- --max-warnings=0)",
+      "Bash(npm run build)",
+      "Bash(npm run test)",
+      "Bash(npm run test:watch)",
+      "Bash(npm run dev)",
+      "Bash(npm run preview)",
+      "Bash(npm audit)",
+      "Bash(npm ci)",
+      "Bash(cd lambda && npm run typecheck)",
+      "Bash(cd lambda && npm run build)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh repo view:*)"
+    ],
+
+    "deny": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)",
+      "Bash(git revert:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git restore:*)",
+      "Bash(git stash:*)",
+      "Bash(git clean:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(git tag:*)",
+      "Bash(git config:*)",
+      "Bash(git remote:*)",
+      "Bash(git init:*)",
+      "Bash(git apply:*)",
+      "Bash(git am:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr review:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh release:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo delete:*)",
+      "Bash(gh repo edit:*)",
+      "Bash(npm publish:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)"
+    ]
+  },
+
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -n \"$(git status --porcelain 2>/dev/null)\" && printf '\\n--- uncommitted changes ---\\n%s\\n--- reminders (CONVENTIONS.md §11) ---\\n- run `npm run lint && npm run test` (or /verify) before requesting commit\\n- update docs/ISSUES.md if new issues discovered\\n- update docs/roadmap/PROJECT.md if milestones completed\\n- commit/push はユーザが行う。 Claude は変更をまとめて提案するだけ\\n' \"$(git status --short)\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -5,6 +5,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 このドキュメントは、Claude Code が本リポジトリで作業する際の入口となるガイドです。
 詳細な情報は `docs/` 配下のドキュメントに分割してあるので、用途に応じて参照してください。
 
+## Claude とユーザの役割分担（重要）
+
+このプロジェクトでは、 ユーザがコミット前のすべての変更を自分でレビューしたい意向です。 そのため操作の分担を以下のように厳格に分けています。 `.claude/settings.json` の deny ルールでも強制されています。
+
+### Claude が行うこと
+- `src/` / `lambda/` / `docs/` / `tests/` 配下のファイルの編集・新規作成
+- `npm run lint / test / build / dev / preview` などの開発スクリプト実行
+- `npm audit` / `npm ci` の実行
+- 読取系 git コマンド: `git status` / `diff` / `log` / `show` / `branch` / `fetch`
+- 読取系 gh コマンド: `gh pr view` / `gh issue view` / `gh repo view`
+
+### Claude が**やってはいけない**こと（settings.json で deny 済み）
+- `git add` / `git commit`（amend 含む）
+- `git push` / `git pull`
+- `git merge` / `rebase` / `reset` / `revert` / `cherry-pick`
+- `git checkout` / `switch` / `restore`（作業ツリー上書きの危険）
+- `git stash` / `clean` / `mv` / `rm` / `tag` / `config` / `remote` / `init`
+- `gh pr create / merge / close / edit / review`
+- `gh issue create / close / edit`
+- `gh release` 系、 `gh repo create / delete / edit`
+- `npm publish`
+- `rm -rf` / `rm -fr`
+
+### ユーザが行うこと
+- 変更内容の最終レビュー（IDE や git diff で確認）
+- ステージング・コミット・プッシュ
+- ブランチ操作（merge / rebase / checkout）
+- PR の作成・マージ・close
+- 依存追加時の `npm install`（Claude が `package.json` を編集 → ユーザが install）
+
+**Claude が「commit してください」「push してください」とユーザに指示されたら**、 deny ルールに抵触するためコマンドを直接実行できません。 代わりに**実行すべき具体的なコマンドをユーザに提示してください**（例: `git add docs/ISSUES.md && git commit -m "fix: ..."`）。 ユーザが手元で実行します。
+
+## セッション開始時の動線
+
+新しいセッションを始めるときは、次の順で context を回収してください。
+
+1. **このファイル（CLAUDE.md）を最後まで読む** — プロジェクト全体像と作業方針
+2. **`docs/ISSUES.md` を確認** — 未解決の不具合や保留中の課題があるか
+3. **`docs/roadmap/PROJECT.md` で次に着手すべき Phase / Milestone を確認** — 未チェックのチェックボックスが現在の作業候補
+4. **`git log --oneline -10` で直近の commit メッセージを確認** — 進行中の流れを掴む
+
+迷ったらユーザに `/next-task` skill を提案してください（`.claude/skills/next-task/SKILL.md`）。 ROADMAP と ISSUES を突き合わせて候補を抽出します。
+
+## このプロジェクト専用 Skills
+
+`.claude/skills/` 配下にプロジェクト固有のスキルがあります。
+
+| Skill | 用途 |
+|-------|------|
+| `/verify` | `npm run lint && npm run test && npm run build` を順に実行して結果を要約。 コード変更後の検証に使用 |
+| `/next-task` | `ISSUES.md` と `roadmap/PROJECT.md` を突き合わせて、 次の作業候補を優先度付きで提示 |
+| `/add-issue` | `docs/ISSUES.md` の既存フォーマット（Priority / ファイル / 現象 / 対応方針）に従って新規エントリを追加 |
+
 ## 関連ドキュメント
 
 | ファイル | 用途 |
@@ -31,7 +84,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npm run dev` | Vite 開発サーバを起動（http://localhost:5173） |
 | `npm run build` | `dist/` に本番用ビルド |
 | `npm run preview` | ビルド済みバンドルをローカル配信 |
-| `npm run lint` | ESLint 実行（テストランナーは未導入） |
+| `npm run lint` | ESLint 実行 |
+| `npm run test` | Vitest で `tests/*.test.js` を一度実行 |
+| `npm run test:watch` | Vitest の watch モード（変更検知で再実行） |
+
+これら 3 つ（lint / test / build）を順に走らせるには `/verify` skill を使うのが便利。
+
+### Node バージョン要件
+
+`package.json` の `engines.node` は `>=18` だが、 transitive deps（`rolldown-vite` / `@vitejs/plugin-react` / `@oxc-project/runtime`）が **Node 20.19.0 以上 または 22.12.0 以上** を要求するため、 実用上は **Node 20.19.x LTS / 22.x LTS** を使ってください。 Node 14 や 20.12 系では EBADENGINE 警告が出ます。
 
 ### ビルドツールの注意点
 
