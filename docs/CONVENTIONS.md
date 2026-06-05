@@ -24,7 +24,7 @@
 - ハマりやすい罠（例: `useFrame` で setState しない理由）
 
 ### 1.4 コメントに書くべきでないこと
-- タスク管理情報（「TODO: 後で直す」のような期限付きメモ — 代わりに `docs/ROADMAP.md` or `docs/ISSUES.md` に書く）
+- タスク管理情報（「TODO: 後で直す」のような期限付きメモ — 代わりに `docs/roadmap/PROJECT.md` or `docs/ISSUES.md` に書く）
 - PR/Issue 番号（git log を見れば分かるので）
 
 ---
@@ -191,7 +191,7 @@ Claude Code は以下のタイミングで `docs/` 配下を更新する：
 |----------|------------------|
 | Issue を解決した | `docs/ISSUES.md`（該当項目を削除 or 解決済みへ） |
 | 新しいバグ・不整合を発見した | `docs/ISSUES.md`（追記） |
-| マイルストーンを完了した | `docs/ROADMAP.md`（完了済みへ移動） |
+| マイルストーンを完了した | `docs/roadmap/PROJECT.md`（完了済みへ移動） |
 | アーキテクチャに関わる変更をした | `docs/ARCHITECTURE.md`（該当節を更新） |
 | 新しい規約が生まれた | このファイル（`CONVENTIONS.md`） |
 | 上記に該当しないが重要な変更をした | `CLAUDE.md` のトップレベル（最小限に） |

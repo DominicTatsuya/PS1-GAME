@@ -10,9 +10,8 @@
  * スタミナが減らされる。被弾は App 側でクールダウン管理されるので、
  * このコンポーネントは「当たっている」という信号を出すだけで良い。
  */
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import * as THREE from "three";
 import { TRAP } from "../data/config";
 import { trapWarn } from "../systems/Audio";
 
@@ -61,14 +60,15 @@ export default function Trap({ position, phaseOffset = 0, onHit, id }) {
     }
 
     // 予兆開始時に 1 度だけ警告音を鳴らす
+    // new THREE.Vector3 を避けるため、camera との距離は自前で計算する
     const cycleNumber = Math.floor((t + phaseOffset * cycle) / cycle);
     const isInWarn = phased >= warnStart && phased < activeStart;
     if (isInWarn && lastWarnCycle.current !== cycleNumber) {
       // プレイヤーが近くにいる時だけ鳴らす（遠くの罠は無音）
-      const dist = camera.position.distanceTo(
-        new THREE.Vector3(position[0], camera.position.y, position[2])
-      );
-      if (dist < 6) trapWarn();
+      const pdx = camera.position.x - position[0];
+      const pdz = camera.position.z - position[2];
+      const pDistSq = pdx * pdx + pdz * pdz;
+      if (pDistSq < 36) trapWarn(); // 6 メートル以内
       lastWarnCycle.current = cycleNumber;
     }
 
@@ -82,9 +82,6 @@ export default function Trap({ position, phaseOffset = 0, onHit, id }) {
       }
     }
   });
-
-  // マウント時に 1 度だけ位相ログ（なくても動くので省略）
-  useEffect(() => {}, []);
 
   return (
     <group position={position}>

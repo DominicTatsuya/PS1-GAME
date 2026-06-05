@@ -9,13 +9,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | ファイル | 用途 |
 |----------|------|
+| `docs/README.md` | docs/ 全体の索引と階層構造の説明 |
 | `docs/ARCHITECTURE.md` | ゲーム全体のアーキテクチャ・状態管理・データフローの詳細 |
-| `docs/ROADMAP.md` | 今後の実装方針と優先度付きタスクリスト |
+| `docs/roadmap/PROJECT.md` | 今後の実装方針と優先度付きタスクリスト（Phase 順） |
+| `docs/roadmap/CAREER.md` | 本プロジェクトを学習媒体としたキャリア習得計画（SRE 転向） |
 | `docs/ISSUES.md` | 既知の不具合・壊れているコード・修正が必要な箇所 |
 | `docs/CONVENTIONS.md` | コーディング規約・コメント言語・命名ルール |
+| `docs/infra/` | Phase 4 以降の運用・インフラ系ドキュメント置き場（現状ほぼ空） |
 | `README.md` | ユーザー向けのプロジェクト紹介・操作方法 |
 
-**作業開始前に必ず `docs/ISSUES.md` と `docs/ROADMAP.md` を確認してください。** 既に把握されている不具合や進行中のタスクを把握してから作業することで、重複や競合を避けられます。
+**作業開始前に必ず `docs/ISSUES.md` と `docs/roadmap/PROJECT.md` を確認してください。** 既に把握されている不具合や進行中のタスクを把握してから作業することで、重複や競合を避けられます。
+
+**AWS / IaC / SRE 関連の作業を行う場合は `docs/roadmap/PROJECT.md` の「Claude Code への作業方針（重要）」も必ず読んでください。** 一括生成を避け、段階的・レビュー可能な手順で進めるという特別な方針が設定されています。
 
 ## よく使うコマンド
 
@@ -36,7 +41,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Lambda バックエンド（`lambda/`）
 
-スコアランキング用の DynamoDB バックエンドです。**現状コンパイルが通らない未完成コードなので、修正・補完が必要です**（詳細は `docs/ISSUES.md`）。
+スコアランキング用の DynamoDB バックエンドです。`handler.ts` は POST `/scores` と GET `/scores/top` を実装済みで、`npm run typecheck` / `npm run build` ともに通る状態です。**ただしフロント側からの送信コードは未実装**のため、事実上未接続です（`docs/ISSUES.md` #15）。AWS 環境への実デプロイは `docs/roadmap/PROJECT.md` の Phase 4 で対応予定。
 
 | コマンド | 用途 |
 |----------|------|
@@ -44,7 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `cd lambda && npm run build` | esbuild で `lambda/dist/handler.js` を生成 |
 | `cd lambda && npm run build:zip` | Lambda デプロイ用 zip を生成 |
 
-`lambda/DYNAMODB.md` は空ファイルです。スキーマ情報は `handler.ts` の `@aws-sdk/lib-dynamodb` 呼び出しから読み取ってください。
+DynamoDB のテーブル設計・GSI・CLI 作成例は `lambda/DYNAMODB.md` に記述済みです。
 
 ## アーキテクチャ概要（短縮版）
 
@@ -94,7 +99,7 @@ WASD と Shift は `PlayerController.jsx` 内で `document` に直接 keydown/ke
 
 ## 設計上の落とし穴（初見では気づきにくいもの）
 
-1. **`src/data/config.js` の `MAZE` 定数は使われていない。** `generateDungeon` 内部で `MAZE_W=10`, `MAZE_H=10`, `CELL_SIZE=2.0`, `WALL_HEIGHT=3.5` がハードコードされています。迷路サイズを変更したい場合は両方を書き換える必要があります。→ `docs/ISSUES.md` 参照。
-2. **`TORCH.MAX_COUNT` も反映されていない。** config は `30` ですが `generateDungeon` では `25` がハードコード。
-3. **`src/shaders/` は空ディレクトリ。** README には「将来拡張」とありますが、現時点で .gitkeep のみ。
-4. **`lambda/handler.ts` はコンパイル不可。** タイポ（`ValidatationError`, `RewuestBody`, `topRecord`）や未閉じのブレースが複数あります。触る前に `docs/ISSUES.md` を必ず確認してください。
+1. **`src/shaders/` は空ディレクトリ。** README には「将来拡張」とありますが、現時点で `.gitkeep` のみ。Phase 3（PS1 表現深化）で vertex snapping / アフィンテクスチャマッピングを実装する予定。
+2. **フロント側にスコア送信コードがない。** Lambda 側（`lambda/src/handler.ts`）の POST `/scores` と GET `/scores/top` は実装済みだが、`src/App.jsx` の `handleExitReach` は localStorage 更新のみで、Lambda への fetch を行わない。Phase 4.2 で実装予定（`docs/ISSUES.md` #15）。
+3. **API ベース URL の管理機構が未整備。** `.env.example` も `import.meta.env.VITE_API_BASE` の参照もない。Phase 4.1〜4.2 で必要になる（`docs/ISSUES.md` #16）。
+4. **AWS / IaC / CI/CD は全て未着手。** `.github/workflows/`、`*.tf`、`cdk.json`、`template.yaml`、`docs/INFRA.md` のいずれも存在しない。Phase 4〜7 で段階的に整備予定。

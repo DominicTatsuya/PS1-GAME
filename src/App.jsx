@@ -438,21 +438,20 @@ export default function App() {
   }, []);
 
   const handleItemCollect = useCallback((id) => {
+    // collectedItemsRef は真実のソース。サイズを取って新カウントを確定する
+    // （setState コールバックで副作用を起こすと StrictMode で二重発火する可能性があるため、
+    //  副作用はここで先に実行して、setState は純粋な値更新のみに留める）
     collectedItemsRef.current.add(id);
-    setScore((prev) => {
-      const next = prev + ITEMS.SCORE_PER_ITEM;
-      return next;
-    });
-    setItemCount((prev) => {
-      const next = prev + 1;
-      // 最後のアイテムを取った時点でポータル活性化音を鳴らす
-      if (next >= totalItems) {
-        Audio.portalActivate();
-      } else {
-        Audio.pickup();
-      }
-      return next;
-    });
+    const nextCount = collectedItemsRef.current.size;
+
+    if (nextCount >= totalItems) {
+      Audio.portalActivate();
+    } else {
+      Audio.pickup();
+    }
+
+    setScore((prev) => prev + ITEMS.SCORE_PER_ITEM);
+    setItemCount(nextCount);
   }, [totalItems]);
 
   /**

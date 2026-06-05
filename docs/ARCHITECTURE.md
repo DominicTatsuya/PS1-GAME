@@ -9,7 +9,7 @@
 
 本作は **React 19 + @react-three/fiber + Three.js** で構築された、一人称視点の 3D ダンジョン探索ゲームです。
 
-- バックエンド無し（Lambda は別案件として未接続）
+- Lambda バックエンド（スコアランキング API）は `lambda/` 配下に実装済みだが、フロント側の送信コードは未実装のため事実上未接続。Phase 4.2 で接続予定（`roadmap/PROJECT.md`・`ISSUES.md` #15）
 - SPA。ルーティング無し
 - 画面遷移はゲーム状態（`isLocked` / `cleared`）で切り替わる
 
@@ -278,11 +278,16 @@ App.setNearItem(closest)
 
 ## 9. 既知の設計上の妥協・制限
 
-- 敵・動的オブジェクトが存在しない（README の「今後の拡張」で言及）。
-- サウンドなし。
-- スコア/タイムの永続化なし（`localStorage` 未利用）。
-- Lambda バックエンドとは未接続。
-- 設定 UI（音量・感度等）なし。
+- **Lambda バックエンドとは未接続。** スコアランキング API（`lambda/src/handler.ts`）は実装済みだが、フロント側からの送信コードが未実装。`roadmap/PROJECT.md` の Phase 4.2 で接続予定（`ISSUES.md` #15）。
+- **設定 UI（音量・感度等）なし。** Audio システム自体は実装済み（`src/systems/Audio.js`）だが、UI からの調整手段は未整備。
+- **AWS 公開・IaC・CI/CD は全て未着手。** S3+CloudFront 配信、Terraform 等の IaC、GitHub Actions、CloudWatch SRE は新 ROADMAP の Phase 4〜7 で段階的に整備する計画（`roadmap/PROJECT.md`）。
+- **PS1 表現の深化（vertex snapping / アフィンテクスチャ / postprocessing）は未着手。** `src/shaders/` は `.gitkeep` のみ。Phase 3 で対応予定。
+
+過去の制限のうち、現在は解決済みのもの（参考）:
+
+- ~~敵・動的オブジェクトが存在しない~~ → `Enemy.jsx`（BFS 追跡）、`Trap.jsx`、`Door.jsx` / `KeyItem.jsx` を実装済
+- ~~サウンドなし~~ → `src/systems/Audio.js`（Web Audio API 手続き合成）を実装済
+- ~~スコア/タイムの永続化なし~~ → `src/systems/Storage.js`（localStorage）を実装済
 
 ---
 

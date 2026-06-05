@@ -13,6 +13,20 @@
 
 ## Priority: Medium（動作するがバグ / 不整合）
 
+### Issue #15 — フロント側にスコア送信コードが無く Lambda が事実上未接続
+
+**ファイル**: `src/App.jsx`（`handleExitReach`）、`src/components/UI/GameUI.jsx`（クリア画面）
+
+`lambda/src/handler.ts` には POST `/scores` と GET `/scores/top` が実装済みで `npm run typecheck` / `npm run build` も通る状態だが、フロント側に対応するコードが存在しない。具体的に欠けているもの:
+
+- クリア時のユーザ名入力ダイアログ
+- クリア時の `fetch(POST /scores)` 呼び出し（タイム・スコア・seed・難易度を送信）
+- スタート画面での `fetch(GET /scores/top)` 呼び出しと Top10 表示
+
+**対応方針**: `docs/roadmap/PROJECT.md` の Phase 4.2 で実装。Issue #16（API URL 管理）と合わせて進める。
+
+---
+
 ### Issue #4 — `src/shaders/` が空ディレクトリ
 
 **ファイル**: `src/shaders/.gitkeep`
@@ -39,6 +53,20 @@ README には「シェーダー実装用（将来拡張）」とあるが実質�
 ---
 
 ## Priority: Low（改善推奨 / ランタイムへの影響小）
+
+### Issue #16 — `.env.example` が無く API ベース URL の管理機構が未整備
+
+**ファイル**: リポジトリルート（`.env.example` 不在）、`src/systems/`（API クライアント不在）
+
+Lambda へのスコア送信（Issue #15）を実装する際、API のベース URL を環境ごとに切り替える仕組みが必要になる。現状フロント側のコードベースに以下が一切無い:
+
+- `.env.example` / `.env.local`
+- `import.meta.env.VITE_API_BASE` の参照
+- `src/systems/` 配下に API クライアント相当のファイル
+
+**対応方針**: Phase 4.1〜4.2 で導入。Vite は `VITE_` プレフィックスの環境変数を自動的にクライアントへ露出するため、`VITE_API_BASE` という命名で `.env.example` を整備し、`src/systems/Api.js`（仮）から参照する形が素直。本番 URL は CloudFront/API Gateway のドメインを CI/CD（Phase 7.2）で注入する。
+
+---
 
 ### Issue #6 — `useFrame` 内で `new THREE.Vector3()` を毎フレーム生成している
 

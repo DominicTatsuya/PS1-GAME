@@ -130,41 +130,42 @@ export default function Enemy({
     }
 
     // 経路に沿って移動
+    // B2 修正: ドアでブロックされても useFrame 後半のメッシュ更新まで続ける
+    // （以前は return で抜けていたため敵の表示が凍る不具合があった）
     if (sighted && pathRef.current.length > pathIndexRef.current + 1) {
-      // 次に向かうセル（現在セルの次）
-      let target = pathRef.current[pathIndexRef.current + 1];
-      // 閉じているドアには入らない（プレイヤーと同じ制約）
-      if (closedDoorCellsRef && closedDoorCellsRef.current) {
-        const doorKey = `${target.gx},${target.gy}`;
-        if (closedDoorCellsRef.current.has(doorKey)) {
-          return; // ブロックされたら停止
+      const target = pathRef.current[pathIndexRef.current + 1];
+      const doorKey = `${target.gx},${target.gy}`;
+      const blockedByDoor =
+        closedDoorCellsRef && closedDoorCellsRef.current && closedDoorCellsRef.current.has(doorKey);
+
+      if (!blockedByDoor) {
+        // ターゲットセルのワールド座標中心
+        const offsetX = (gridW * cellSize) / 2;
+        const offsetZ = (gridH * cellSize) / 2;
+        const tx = target.gx * cellSize - offsetX + cellSize / 2;
+        const tz = target.gy * cellSize - offsetZ + cellSize / 2;
+        // 方向ベクトル
+        const mdx = tx - posRef.current.x;
+        const mdz = tz - posRef.current.z;
+        const mdist = Math.sqrt(mdx * mdx + mdz * mdz);
+        if (mdist < 0.15) {
+          // 次セル到達 → 経路を進める
+          pathIndexRef.current++;
+        } else {
+          // 等速移動
+          const step = ENEMY.SPEED * delta;
+          const nx = posRef.current.x + (mdx / mdist) * step;
+          const nz = posRef.current.z + (mdz / mdist) * step;
+          const candidate = { x: nx, z: nz };
+          // 壁衝突チェック（プレイヤーと同じ関数。ドアも考慮）
+          const closedDoors = closedDoorCellsRef ? closedDoorCellsRef.current : null;
+          if (!checkGridCollision(candidate, grid, gridW, gridH, cellSize, 0.3, closedDoors)) {
+            posRef.current.x = nx;
+            posRef.current.z = nz;
+          }
         }
       }
-      // ターゲットセルのワールド座標中心
-      const offsetX = (gridW * cellSize) / 2;
-      const offsetZ = (gridH * cellSize) / 2;
-      const tx = target.gx * cellSize - offsetX + cellSize / 2;
-      const tz = target.gy * cellSize - offsetZ + cellSize / 2;
-      // 方向ベクトル
-      const mdx = tx - posRef.current.x;
-      const mdz = tz - posRef.current.z;
-      const mdist = Math.sqrt(mdx * mdx + mdz * mdz);
-      if (mdist < 0.15) {
-        // 次セル到達 → 経路を進める
-        pathIndexRef.current++;
-      } else {
-        // 等速移動
-        const step = ENEMY.SPEED * delta;
-        const nx = posRef.current.x + (mdx / mdist) * step;
-        const nz = posRef.current.z + (mdz / mdist) * step;
-        const candidate = { x: nx, z: nz };
-        // 壁衝突チェック（プレイヤーと同じ関数。ドアも考慮）
-        const closedDoors = closedDoorCellsRef ? closedDoorCellsRef.current : null;
-        if (!checkGridCollision(candidate, grid, gridW, gridH, cellSize, 0.3, closedDoors)) {
-          posRef.current.x = nx;
-          posRef.current.z = nz;
-        }
-      }
+      // blockedByDoor の場合は何もせずメッシュ更新フェーズへ進む
     }
 
     // メッシュに反映（少し浮遊）

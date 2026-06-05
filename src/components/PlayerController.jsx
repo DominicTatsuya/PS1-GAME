@@ -81,23 +81,21 @@ export default function PlayerController({
   const direction = useRef(new THREE.Vector3());
   const keys = useRef({ w: false, a: false, s: false, d: false, shift: false });
   const headBob = useRef(0);
-  const initialized = useRef(false);
   const lanternRef = useRef();
   // 足音の直近再生 headBob 値（同じ周期で 2 回鳴らないようにする）
   const lastFootstepBob = useRef(0);
 
   /**
    * useEffect フック（カメラ初期位置の設定）:
-   * useEffect は、コンポーネントがマウント（画面に表示）されたときや、
-   * 依存配列（第2引数の配列）の値が変化したときに実行される。
+   * dungeon が変わるたびにカメラを新しいスタート位置へ戻す。
    *
-   * ここでは、ダンジョンデータが利用可能になったらカメラをスタート位置に移動する。
-   * initialized フラグを使って、初回のみ実行されるようにしている。
+   * 依存配列は [dungeon, camera]。dungeon は seed 依存の useMemo なので、
+   * 同じ seed の間は参照が変わらず、ゲーム中に勝手にカメラが戻ることはない。
+   * リスタート・難易度変更で seed が変わると、新 dungeon → 新 startPos へ移動。
    */
   useEffect(() => {
-    if (!initialized.current && dungeon) {
+    if (dungeon) {
       camera.position.set(dungeon.startPos.x, dungeon.startPos.y, dungeon.startPos.z);
-      initialized.current = true;
     }
   }, [dungeon, camera]);
 
@@ -123,18 +121,18 @@ export default function PlayerController({
 
   /**
    * useEffect フック（ポインターロック時のフォーカス）:
-   * ポインターがロックされたとき、canvas にフォーカスを移す。
-   * これにより、キーボード入力が確実に canvas に届くようになる。
+   * ポインターがロックされたとき、canvas にフォーカスを移す
+   * これにより、キーボード入力が確実に canvas に届くようになる
    */
   useEffect(() => { if (isLocked && gl.domElement) { gl.domElement.focus(); } }, [isLocked, gl]);
 
   /**
    * useFrame フック（メインのゲームループ）:
-   * 毎フレーム呼ばれ、プレイヤーの移動・衝突判定・各種状態更新を行う。
+   * 毎フレーム呼ばれ、プレイヤーの移動・衝突判定・各種状態更新を行う
    *
    * @param {object} state - Three.js のレンダリング状態（時刻情報など）
-   * @param {number} delta - 前フレームからの経過時間（秒）。
-   *   移動量を delta に掛けることで、フレームレートに関係なく一定速度で動くようにする。
+   * @param {number} delta - 前フレームからの経過時間（秒）
+   *   移動量を delta に掛けることで、フレームレートに関係なく一定速度で動くようにする
    */
   useFrame((state, delta) => {
     if (!isLocked || !dungeon) return;
@@ -143,7 +141,7 @@ export default function PlayerController({
 
     /**
      * 移動方向の計算:
-     * WASDキーの入力に応じて direction ベクトルを設定する。
+     * WASDキーの入力に応じて direction ベクトルを設定する
      * z軸: W（前進 +1）/ S（後退 -1）
      * x軸: A（左 -1）/ D（右 +1）
      */
@@ -155,8 +153,8 @@ export default function PlayerController({
 
     /**
      * ダッシュ判定とスタミナ管理:
-     * Shiftキーを押しながら移動するとダッシュ（速度1.67倍）。
-     * ダッシュ中はスタミナが減り、歩行中はスタミナが回復する。
+     * Shiftキーを押しながら移動するとダッシュ（速度1.67倍）
+     * ダッシュ中はスタミナが減り、歩行中はスタミナが回復する
      */
     const sprinting = keys.current.shift && staminaRef.current > 0 && direction.current.length() > 0;
     const speed = sprinting ? PLAYER.SPRINT_SPEED : PLAYER.SPEED;
