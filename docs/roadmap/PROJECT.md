@@ -48,12 +48,12 @@ Claude Code は **Phase 順** に進めることを推奨します。緊急度�
 ※開発者の制作上の関心の中心。スキル習得トラック（Phase 4 以降）と**並行して進めてよい**。
 
 ### Milestone 3.1: 頂点スナッピング
-- [ ] カスタム vertex shader でポリゴン座標をグリッド量子化
-- [ ] `src/shaders/ps1-vertex.glsl` を配置し、`<shaderMaterial>` で適用
+- [x] `src/shaders/ps1-vertex.glsl` を配置し、`onBeforeCompile` で `meshStandardMaterial` に注入する形で適用（`Structure.jsx` の壁マテリアルに有効化済）
+- [ ] 床・天井・トーチ・敵・罠など、他のマテリアルへの展開（現状は壁のみ）
 ### Milestone 3.2: アフィンテクスチャマッピング
 - [ ] フラグメントシェーダで PS1 独特のテクスチャ歪みを再現
 ### Milestone 3.3: ポストプロセス
-- [ ] `@react-three/postprocessing` 導入（CRT 湾曲 / ノイズ / ブルーム）
+- [x] `@react-three/postprocessing` 導入。`src/components/PostFX.jsx` に Bloom / Noise / Vignette を薄く重ねる構成で実装。CRT 湾曲は CSS スキャンライン＋ビネットで既に表現できているので postprocess 側では入れていない
 
 ---
 
@@ -67,12 +67,13 @@ Claude Code は **Phase 順** に進めることを推奨します。緊急度�
 
 ### Milestone 4.2: ランキング API（サーバーレス）
 - [x] `lambda/handler.ts`（POST /scores・GET /scores/top）の Lambda 側実装（`../ISSUES.md` #1 で完了）
-- [ ] API Gateway + Lambda + DynamoDB 構成、CORS 設定、環境変数（TABLE_NAME 等）
-- [ ] **フロント側のスコア送信コードを実装**（`../ISSUES.md` #15）。現状クリア時は localStorage 更新のみで、Lambda への送信は行われていない
-  - クリア時のユーザ名入力ダイアログ
-  - `fetch(POST /scores)` 呼び出し
-  - スタート画面で `fetch(GET /scores/top)` を呼んで Top10 表示
-- [ ] API ベース URL の管理機構を整備（`../ISSUES.md` #16）。`.env.example` ＋ `VITE_API_BASE` 参照
+- [ ] API Gateway + Lambda + DynamoDB 構成、CORS 設定、環境変数（TABLE_NAME 等） — **AWS 構築待ち**
+- [x] フロント側のスコア送信コードを実装（`../ISSUES.md` #15）
+  - [x] `src/systems/Api.js` を新設し、`fetch` ラッパ・5s タイムアウト・API 未設定時の no-op を備える
+  - [x] クリア画面にユーザ名入力 + 送信ボタン・送信ステータス表示（`GameUI.jsx`）
+  - [x] スタート画面に Online Top10 一覧を表示
+  - [x] ユーザ名は `Storage.js` で永続化（連続プレイで再入力不要）
+- [x] API ベース URL の管理機構を整備（`../ISSUES.md` #16）。`.env.example` を追加、`VITE_API_BASE` を `Api.js` から参照
 
 ### Milestone 4.3: まず手動で動かす（理解優先）
 - [ ] マネジメントコンソール / CLI で一通り手動構築し、各サービスの役割を理解する
@@ -85,8 +86,7 @@ Claude Code は **Phase 順** に進めることを推奨します。緊急度�
 **目的**: Phase 4 の手動構成を再現可能にし、IaC を習得する。
 
 ### Milestone 5.1: ツール選定
-- [ ] Terraform / AWS CDK / SAM から選定し、**選定理由を `docs/` に明記**する
-  - 推奨：**Terraform**（他クラウド・一般的な SRE 求人での転用度を優先）。AWS 単一に閉じるなら CDK / SAM も可。
+- [x] Terraform / AWS CDK / SAM から選定し、選定理由を `infra/IAC_CHOICE.md` に記述。採用は **Terraform**（SRE 求人での転用度・マルチクラウド適用性を優先）
 ### Milestone 5.2: IaC 化
 - [ ] S3 + CloudFront + Lambda + DynamoDB + API Gateway を一式コード化
 - [ ] 環境変数・権限（IAM）も IaC で管理
@@ -111,14 +111,16 @@ Claude Code は **Phase 順** に進めることを推奨します。緊急度�
 ## Phase 7: 品質・運用（旧 Phase 5）
 
 ### Milestone 7.1: テスト整備
-- [ ] Vitest 導入、`MapGenerator` 純粋関数の単体テスト（同 seed の再現性 / 迷路の連結性 / `checkGridCollision` 境界）
+- [x] Vitest 導入、`MapGenerator` 純粋関数の単体テスト（同 seed の再現性 / 迷路の連結性 / `checkGridCollision` 境界 / `bfsFarthest` / `bfsShortestPath`）を `tests/MapGenerator.test.js` に追加。`npm run test` で実行
+- [ ] `Storage.js` / `Api.js` / `applyDifficulty` のテスト追加（`../ISSUES.md` #11）
 ### Milestone 7.2: CI/CD
 - [ ] GitHub Actions で lint + build + test
 - [ ] main マージで S3 / CloudFront へ自動デプロイ（AWS 認証は長期キーでなく OIDC 連携を推奨）
 ### Milestone 7.3: TypeScript 移行（任意）
 - [ ] `systems/` から段階的に `.ts` 化、`strict: true`
 ### Milestone 7.4: パフォーマンス
-- [ ] `PlayerController` の `useFrame` 内 alloc 削減（`../ISSUES.md` #6）、`stats.js` を dev 時のみ表示
+- [x] `PlayerController` の `useFrame` 内 alloc 削減（`../ISSUES.md` #6）。 forward / right / yawDir / tmp の 4 本を ref で持ち、`UP_VECTOR` 定数を抽出
+- [ ] `stats.js` を dev 時のみ表示
 
 ---
 

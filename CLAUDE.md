@@ -99,7 +99,7 @@ WASD と Shift は `PlayerController.jsx` 内で `document` に直接 keydown/ke
 
 ## 設計上の落とし穴（初見では気づきにくいもの）
 
-1. **`src/shaders/` は空ディレクトリ。** README には「将来拡張」とありますが、現時点で `.gitkeep` のみ。Phase 3（PS1 表現深化）で vertex snapping / アフィンテクスチャマッピングを実装する予定。
-2. **フロント側にスコア送信コードがない。** Lambda 側（`lambda/src/handler.ts`）の POST `/scores` と GET `/scores/top` は実装済みだが、`src/App.jsx` の `handleExitReach` は localStorage 更新のみで、Lambda への fetch を行わない。Phase 4.2 で実装予定（`docs/ISSUES.md` #15）。
-3. **API ベース URL の管理機構が未整備。** `.env.example` も `import.meta.env.VITE_API_BASE` の参照もない。Phase 4.1〜4.2 で必要になる（`docs/ISSUES.md` #16）。
-4. **AWS / IaC / CI/CD は全て未着手。** `.github/workflows/`、`*.tf`、`cdk.json`、`template.yaml`、`docs/INFRA.md` のいずれも存在しない。Phase 4〜7 で段階的に整備予定。
+1. **AWS バックエンドはまだ存在しない。** Lambda（`lambda/src/handler.ts`）とフロント側送信コード（`src/systems/Api.js`、`GameUI.jsx` のクリア画面）は揃っているが、API Gateway / Lambda 実体 / DynamoDB テーブルは未構築。 `VITE_API_BASE` 未設定なので `Api.js` は no-op として動き、フロントは「オフラインモード」表示になる。Phase 4.1〜4.3 で構築する。
+2. **IaC・CI/CD・SRE は未着手。** `*.tf`、`.github/workflows/`、`docs/infra/INFRA.md` は未だ無い。 IaC ツールは Terraform で確定済（`docs/infra/IAC_CHOICE.md`）。 Phase 5〜7 で段階的に整備する。
+3. **`src/shaders/` には頂点スナップだけが入っている。** Phase 3.1 の最小実装として `ps1-vertex.glsl` と `applyPs1VertexSnap.js` を追加し、 `Structure.jsx` の壁に適用済。 アフィンテクスチャマッピング（Phase 3.2）は未実装。
+4. **`PostFX.jsx` は薄めの設定。** Bloom / Noise / Vignette を控えめに重ねている。重い・崩れる場合は `PostFX.jsx` の `ENABLED = false` または `App.jsx` の `<PostFX />` を外す。

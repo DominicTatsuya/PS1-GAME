@@ -13,25 +13,7 @@
 
 ## Priority: Medium（動作するがバグ / 不整合）
 
-### Issue #15 — フロント側にスコア送信コードが無く Lambda が事実上未接続
-
-**ファイル**: `src/App.jsx`（`handleExitReach`）、`src/components/UI/GameUI.jsx`（クリア画面）
-
-`lambda/src/handler.ts` には POST `/scores` と GET `/scores/top` が実装済みで `npm run typecheck` / `npm run build` も通る状態だが、フロント側に対応するコードが存在しない。具体的に欠けているもの:
-
-- クリア時のユーザ名入力ダイアログ
-- クリア時の `fetch(POST /scores)` 呼び出し（タイム・スコア・seed・難易度を送信）
-- スタート画面での `fetch(GET /scores/top)` 呼び出しと Top10 表示
-
-**対応方針**: `docs/roadmap/PROJECT.md` の Phase 4.2 で実装。Issue #16（API URL 管理）と合わせて進める。
-
----
-
-### Issue #4 — `src/shaders/` が空ディレクトリ
-
-**ファイル**: `src/shaders/.gitkeep`
-
-README には「シェーダー実装用（将来拡張）」とあるが実質使われていない。Phase 3（PS1 表現の深化）で vertex snapping / アフィンテクスチャマッピングを実装する予定なので、現状は `.gitkeep` のまま保持する。
+（現時点で未解決の Medium priority issue はありません。Issue #15 / #16 は Phase 4 でフロント側の準備が済んだので、AWS バックエンドの構築待ちに移行しました）
 
 ---
 
@@ -53,43 +35,6 @@ README には「シェーダー実装用（将来拡張）」とあるが実質�
 ---
 
 ## Priority: Low（改善推奨 / ランタイムへの影響小）
-
-### Issue #16 — `.env.example` が無く API ベース URL の管理機構が未整備
-
-**ファイル**: リポジトリルート（`.env.example` 不在）、`src/systems/`（API クライアント不在）
-
-Lambda へのスコア送信（Issue #15）を実装する際、API のベース URL を環境ごとに切り替える仕組みが必要になる。現状フロント側のコードベースに以下が一切無い:
-
-- `.env.example` / `.env.local`
-- `import.meta.env.VITE_API_BASE` の参照
-- `src/systems/` 配下に API クライアント相当のファイル
-
-**対応方針**: Phase 4.1〜4.2 で導入。Vite は `VITE_` プレフィックスの環境変数を自動的にクライアントへ露出するため、`VITE_API_BASE` という命名で `.env.example` を整備し、`src/systems/Api.js`（仮）から参照する形が素直。本番 URL は CloudFront/API Gateway のドメインを CI/CD（Phase 7.2）で注入する。
-
----
-
-### Issue #6 — `useFrame` 内で `new THREE.Vector3()` を毎フレーム生成している
-
-**ファイル**: `src/components/PlayerController.jsx` L175, L179, L233, L255
-
-```js
-const forward = new THREE.Vector3();      // 毎フレーム alloc
-const right = new THREE.Vector3();         // 毎フレーム alloc
-const dir = new THREE.Vector3();           // 毎フレーム alloc
-camera.position.distanceTo(new THREE.Vector3(...))  // 毎フレーム alloc
-```
-
-60fps だと毎秒 240+ オブジェクトの生成。GC 圧力の原因。
-
-**対応方針**: コンポーネントトップに `useRef(new THREE.Vector3())` で使い回し用のインスタンスを作り、`useFrame` 内では `.set()` で更新する。
-
-### Issue #7 — キーボードリスナが `document` に二重登録される可能性
-
-**ファイル**: `src/components/PlayerController.jsx` L107-116
-
-`useEffect` で `document.addEventListener("keydown", ...)` を登録している。依存配列が `[gl]` だけなので通常は 1 回だけだが、React 19 の StrictMode 下で開発時に 2 回登録→ 1 回解除される挙動になる。E キー押下でアイテムが 2 つ取れるなど稀な競合の原因になりうる。
-
-**対応方針**: 現状 StrictMode が有効かを `main.jsx` で確認し、必要なら `capture: true` + 同一参照での remove を厳密化する。
 
 ### Issue #8 — コンパイル時の警告メッセージが未確認
 
@@ -113,10 +58,13 @@ E キー押下のリスナを `document` レベルで張っているなら、他
 
 ## Priority: Nice-to-have（品質向上・運用）
 
-### Issue #11 — テストが一切無い
+### Issue #11 — テストカバレッジを広げる
 
-- 単体テスト（`MapGenerator` の生成結果再現性、`checkGridCollision` の境界条件など）の整備を推奨。
-- Vitest を推奨（Vite とスムーズに統合）。
+Vitest を導入し、`MapGenerator` の純粋関数群（同 seed の再現性 / 完全迷路の連結性 / `checkGridCollision` 境界 / `bfsFarthest` / `bfsShortestPath` / `gridToWorld`-`worldToGrid` 往復 など）は `tests/MapGenerator.test.js` でカバー済み。今後追加すべきもの:
+
+- `Storage.js` の localStorage モック越しテスト（ベスト記録の上書きロジック）
+- `Api.js` の fetch モックテスト（API 未設定時の no-op / タイムアウト / エラーパス）
+- `applyDifficulty` 前後で MAZE/ITEMS が baseline に戻る不変条件
 
 ### Issue #12 — `.vscode/settings.json` が TypeScript 寄りになっている
 
@@ -158,3 +106,23 @@ E キー押下のリスナを `document` レベルで張っているなら、他
 ### ~~Issue #5 — `lambda/DYNAMODB.md` が空~~（2026-04-24 解決）
 
 テーブルスキーマ・GSI 設計・CLI 作成例を記述。
+
+### ~~Issue #4 — `src/shaders/` が空ディレクトリ~~（2026-06-05 解決）
+
+Phase 3.1（頂点スナッピング）の最小実装として `src/shaders/ps1-vertex.glsl` と `src/shaders/applyPs1VertexSnap.js` を追加。`onBeforeCompile` で `meshStandardMaterial` に注入する形にして既存のライティングを温存。`src/components/Structure.jsx` の壁マテリアルに適用済み。
+
+### ~~Issue #6 — `useFrame` 内で `new THREE.Vector3()` を毎フレーム生成~~（2026-06-05 解決）
+
+`PlayerController.jsx` の `forward` / `right` / `dir` / アイテム/鍵/出口距離計算用の一時 Vector3 を `useRef` ベースの使い回しに変更。定数の上方向ベクトルは `UP_VECTOR` としてモジュールスコープへ抽出。`useFrame` 内のアロケーションがゼロに。
+
+### ~~Issue #7 — E キーの連打でアイテムが二重に取れる可能性~~（2026-06-05 解決）
+
+`CollectibleItem.jsx` と `KeyItem.jsx` に `collectedGuardRef` を追加。`setCollected(true)` の state 反映前に発火する連続 keydown を同期的に弾くことで、スコア二重加算を防止。当初は `PlayerController.jsx` のリスナ二重登録を疑っていたが、実機検証で E キーは別ファイルに登録されており、そちらの再入防止が本質的な修正だった。
+
+### ~~Issue #15 — フロント側にスコア送信コードが無く Lambda が事実上未接続~~（2026-06-05 解決）
+
+`src/systems/Api.js`（fetch ラッパ・5s タイムアウト・API 未設定時は no-op）を追加。`GameUI.jsx` のクリア画面にユーザ名入力 + 送信ボタン、スタート画面に ONLINE TOP10 一覧を実装。ユーザ名は `Storage.js` の `getSavedUserName` / `saveUserName` で永続化。AWS バックエンド構築後は `VITE_API_BASE` を設定するだけで疎通する。
+
+### ~~Issue #16 — `.env.example` が無く API ベース URL の管理機構が未整備~~（2026-06-05 解決）
+
+`.env.example` を新規作成。`Api.js` から `import.meta.env.VITE_API_BASE` を参照し、未設定時はクライアント側で graceful degradation（送信スキップ・Top10 非表示）。本番 URL は CI/CD（Phase 7.2）で `.env.production` 経由で注入する想定。

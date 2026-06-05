@@ -58,6 +58,7 @@ import Door from "./components/Door";                     // ドア
 import Trap from "./components/Trap";                     // スパイクトラップ
 import Enemy from "./components/Enemy";                   // 敵（追跡型モンスター）
 import ExitPortal from "./components/Goal";               // 脱出ポータル（ゴール）
+import PostFX from "./components/PostFX";                 // PS1 風ポストプロセス（Phase 3.3）
 
 // ===== UIコンポーネント群 =====
 import GameUI from "./components/UI/GameUI";               // HUD（スコア、タイマー等の表示）
@@ -140,7 +141,8 @@ function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked
       ))}
 
       {/* ===== ドア =====
-          対応する鍵を所持していれば open=true。閉じている時は衝突判定で壁扱い */}
+          対応する鍵を所持していれば open=true。閉じている時は衝突判定で壁扱い。
+          rotationY は MapGenerator が path 進行軸から算出した「通路に垂直になる向き」 */}
       {(dungeon.doors || []).map((d) => (
         <Door
           key={`${dungeon.seed}_${d.id}`}
@@ -148,6 +150,7 @@ function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked
           cellSize={dungeon.cellSize}
           wallHeight={dungeon.wallHeight}
           open={heldKeys.has(d.keyId)}
+          rotationY={d.rotationY}
         />
       ))}
 
@@ -210,6 +213,11 @@ function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked
           視認距離を制限し、ダンジョンの暗い雰囲気を演出する。
           args=[色, 開始距離, 終了距離] */}
       <fog attach="fog" args={["#141210", 8, 32]} />
+
+      {/* PS1 風ポストプロセス（Bloom / Noise / Vignette を薄く重ねる）。
+          描画パイプラインの最後段で適用するため、シーン要素の後ろに配置する。
+          切りたい場合はこの 1 行を削除する。 */}
+      <PostFX />
     </>
   );
 }

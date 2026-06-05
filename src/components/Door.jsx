@@ -17,8 +17,10 @@ import { useFrame } from "@react-three/fiber";
  * @param {number} cellSize - ダンジョンの 1 セルのサイズ
  * @param {number} wallHeight - 壁と同じ高さ
  * @param {boolean} open - 開いているかどうか
+ * @param {number} rotationY - 板の向き（ラジアン）。0 でデフォルト（板が X 軸方向 → 南北通路を塞ぐ）、
+ *                              π/2 で東西通路を塞ぐ向き。MapGenerator の path 進行軸から算出される。
  */
-export default function Door({ position, cellSize, wallHeight, open }) {
+export default function Door({ position, cellSize, wallHeight, open, rotationY = 0 }) {
   // ヒンジ（蝶番）の group への参照。回転アニメーションに使う
   const hingeRef = useRef();
   // 現在の開閉度（0=閉、1=全開）。lerpで目標へ近づける
@@ -40,7 +42,9 @@ export default function Door({ position, cellSize, wallHeight, open }) {
   const width = cellSize - 0.1;       // セルサイズよりわずかに小さく
 
   return (
-    <group position={position}>
+    // 外側 group の rotation.y で「板を通路に対して垂直に向ける」回転を担当する。
+    // 内側のヒンジ group はこの回転を継承した上で蝶番回転（開閉）を行う。
+    <group position={position} rotation={[0, rotationY, 0]}>
       {/* ヒンジを位置 0 に置き、その子としてドアパネルを +width/2 オフセットで配置する。
           こうすることで group の回転 = ヒンジ軸を中心とした回転になる */}
       <group ref={hingeRef} position={[-width / 2, 0, 0]}>

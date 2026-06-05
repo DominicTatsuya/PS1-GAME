@@ -20,6 +20,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { generateStoneWallTexture } from "../systems/TextureGenerator";
+import { applyPs1VertexSnap } from "../shaders/applyPs1VertexSnap";
 
 /**
  * DungeonWalls コンポーネント
@@ -118,7 +119,18 @@ export default function DungeonWalls({ wallPositions, cellSize, wallHeight }) {
       <boxGeometry args={[cellSize, wallHeight, cellSize]}>
         <instancedBufferAttribute attach="attributes-color" args={[colorArray, 3]} />
       </boxGeometry>
-      <meshStandardMaterial map={texture} vertexColors flatShading roughness={0.92} metalness={0.03} />
+      {/* onUpdate でマテリアル生成直後に onBeforeCompile をフックし、
+          PS1 風の頂点スナッピングを注入する（Phase 3.1）。
+          視覚的に重すぎる場合は applyPs1VertexSnap の第 2 引数（snapResolution）を
+          大きくする（例: 192）か、この onUpdate を外す。 */}
+      <meshStandardMaterial
+        map={texture}
+        vertexColors
+        flatShading
+        roughness={0.92}
+        metalness={0.03}
+        onUpdate={(m) => applyPs1VertexSnap(m)}
+      />
     </instancedMesh>
   );
 }

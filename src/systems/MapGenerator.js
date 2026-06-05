@@ -610,11 +610,24 @@ export function generateDungeon(seed = Date.now()) {
 
     if (doorCell) {
       const pos = gridToWorld(doorCell.gx, doorCell.gy, gridW, gridH, CELL_SIZE);
+
+      // ─── ドアの向きを path 上の進行軸から決定する ───
+      // doorCell に対して path 上の直前セルとの差分を取り、
+      //   gx が変わっている = 東西通路 → ドア板は Z 方向に広げる必要があるので rotationY = π/2
+      //   gy が変わっている = 南北通路 → デフォルト向き（X 方向に板）で OK → rotationY = 0
+      // doorSearchStart >= path.length*2/3 なので path[doorIndex-1] は必ず存在する。
+      const doorIndex = path.findIndex(
+        (c) => c.gx === doorCell.gx && c.gy === doorCell.gy
+      );
+      const prev = path[doorIndex - 1];
+      const rotationY = prev && prev.gx !== doorCell.gx ? Math.PI / 2 : 0;
+
       doors.push({
         id: "door_0",
         gx: doorCell.gx,
         gy: doorCell.gy,
         position: [pos.x, 0, pos.z],
+        rotationY,
         keyId: "key_0",
       });
       occupied.add(`${doorCell.gx},${doorCell.gy}`);

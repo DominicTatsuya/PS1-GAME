@@ -37,6 +37,12 @@ import { footstep } from "../systems/Audio";
 const CODE_TO_KEY = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", ShiftLeft: "shift", ShiftRight: "shift" };
 
 /**
+ * 上方向ベクトル（Y 軸正方向）。crossVectors で「右ベクトル」を求める基準として使う。
+ * 毎フレーム new するとアロケーション圧がかかるため、変更されない定数としてモジュールスコープに置く。
+ */
+const UP_VECTOR = new THREE.Vector3(0, 1, 0);
+
+/**
  * PlayerController コンポーネント
  *
  * @param {boolean} isLocked - ポインターロック（マウスがゲーム画面にロックされている）状態かどうか
@@ -84,6 +90,19 @@ export default function PlayerController({
   const lanternRef = useRef();
   // 足音の直近再生 headBob 値（同じ周期で 2 回鳴らないようにする）
   const lastFootstepBob = useRef(0);
+
+  /**
+   * useFrame 内で毎フレーム使い回す Vector3 群。
+   *
+   * 旧コードは `new THREE.Vector3()` を毎フレーム生成していたため、
+   * 60fps で毎秒 240+ インスタンスのアロケーションが発生し、GC 圧の原因になっていた（ISSUES #6）。
+   * ref に保持して `.set()` / `.copy()` で使い回すことで、ホットパスのアロケーションをゼロにする。
+   */
+  const forwardVec = useRef(new THREE.Vector3());
+  const rightVec = useRef(new THREE.Vector3());
+  const yawDirVec = useRef(new THREE.Vector3());
+  // アイテム/鍵/出口との距離計算で使う一時ベクトル（順次・排他的に使われるので 1 つで足りる）
+  const tmpVec = useRef(new THREE.Vector3());
 
   /**
    * useEffect フック（カメラ初期位置の設定）:
@@ -176,12 +195,15 @@ export default function PlayerController({
        * 3. forward × 入力のZ成分 + right × 入力のX成分 で、最終的な移動ベクトルを作る。
        */
       direction.current.normalize();
-      const forward = new THREE.Vector3();
+      // 使い回し用 ref ベクトルに毎フレーム値を書き込む（new はしない）
+      const forward = forwardVec.current;
       camera.getWorldDirection(forward);
       forward.y = 0;
       forward.normalize();
-      const right = new THREE.Vector3();
-      right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+      const right = rightVec.current;
+      right.crossVectors(forward, UP_VECTOR);
+      // velocity = forward * z + right * x （right は in-place 乗算されるが、
+      // 次フレームで crossVectors により再計算されるので問題ない）
       velocity.current.copy(forward).multiplyScalar(direction.current.z).add(right.multiplyScalar(direction.current.x)).multiplyScalar(speed * delta);
 
       /**
@@ -246,7 +268,10 @@ export default function PlayerController({
      * Math.atan2(x, z): x と z からラジアン角度を求める逆正接関数。
      * カメラが向いている方角を数値として取得し、コンパスUIに反映する。
      */
-    if (cameraYawRef) { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); cameraYawRef.current = Math.atan2(dir.x, dir.z); }
+    if (cameraYawRef) {
+      camera.getWorldDirection(yawDirVec.current);
+      cameraYawRef.current = Math.atan2(yawDirVec.current.x, yawDirVec.current.z);
+    }
 
     /**
      * 探索済みエリアの記録（ミニマップ用）:
@@ -277,9 +302,9 @@ export default function PlayerController({
       if (items) {
         items.forEach((item) => {
           if (collected && collected.has(item.id)) return;
-          const dist = camera.position.distanceTo(
-            new THREE.Vector3(item.position[0], camera.position.y, item.position[2])
-          );
+          // 一時 ref ベクトルに位置を書き込んでから距離を計算（new を避ける）
+          tmpVec.current.set(item.position[0], camera.position.y, item.position[2]);
+          const dist = camera.position.distanceTo(tmpVec.current);
           if (dist < ITEMS.COLLECT_DISTANCE && dist < minDist) {
             minDist = dist;
             closest = { kind: "item", id: item.id, position: item.position };
@@ -290,9 +315,8 @@ export default function PlayerController({
       // 鍵の近接も同じ距離で判定
       (dungeon.keys || []).forEach((k) => {
         if (heldKeys && heldKeys.has(k.id)) return;
-        const dist = camera.position.distanceTo(
-          new THREE.Vector3(k.position[0], camera.position.y, k.position[2])
-        );
+        tmpVec.current.set(k.position[0], camera.position.y, k.position[2]);
+        const dist = camera.position.distanceTo(tmpVec.current);
         if (dist < ITEMS.COLLECT_DISTANCE && dist < minDist) {
           minDist = dist;
           closest = { kind: "key", id: k.id, position: k.position };
@@ -307,7 +331,11 @@ export default function PlayerController({
      * 出口が有効で、プレイヤーが出口から1.8ユニット以内にいる場合、
      * onExitReach コールバックを呼び出してステージクリア処理を行う。
      */
-    if (onExitReach && exitActive && dungeon.exitPos) { const dist = camera.position.distanceTo(new THREE.Vector3(dungeon.exitPos.x, camera.position.y, dungeon.exitPos.z)); if (dist < 1.8) { onExitReach(); } }
+    if (onExitReach && exitActive && dungeon.exitPos) {
+      tmpVec.current.set(dungeon.exitPos.x, camera.position.y, dungeon.exitPos.z);
+      const dist = camera.position.distanceTo(tmpVec.current);
+      if (dist < 1.8) { onExitReach(); }
+    }
   });
 
   /**

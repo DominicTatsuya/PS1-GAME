@@ -14,9 +14,11 @@
  * - CSSインラインスタイルでレトロなUI演出
  */
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { SCORING, PLAYER, DIFFICULTIES, DIFFICULTY_LABELS } from "../../data/config";
 import * as Audio from "../../systems/Audio";
+import { isApiEnabled, postScore, getTopScores } from "../../systems/Api";
+import { getSavedUserName, saveUserName, USERNAME_MAX_LENGTH } from "../../systems/Storage";
 
 /**
  * Compass コンポーネント（内部コンポーネント）
@@ -186,6 +188,76 @@ export default function GameUI({
   const [sfxVolume, setSfxVolume] = useState(() => Audio.getSfxVolume());
   const [bgmVolume, setBgmVolume] = useState(() => Audio.getBgmVolume());
   const [muted, setMuted] = useState(() => Audio.isMuted());
+
+  // ===== ランキング送信（Phase 4.2 / ISSUES #15） =====
+  // VITE_API_BASE が未設定なら isApiEnabled() が false になり、UI 側で「オフライン」表示にする。
+  const apiEnabled = isApiEnabled();
+
+  // ユーザ名（送信時の表示名）。localStorage から復元して連続プレイ時の手間を減らす
+  const [userName, setUserName] = useState(() => getSavedUserName());
+
+  // 送信ステータス: idle = 未送信, submitting = 送信中, submitted = 完了, error = 失敗
+  const [submitStatus, setSubmitStatus] = useState("idle");
+
+  // Top10 ランキング（スタート画面に表示）
+  const [topScores, setTopScores] = useState([]);
+  const [topLoading, setTopLoading] = useState(false);
+
+  /**
+   * Top10 を再取得する。API 無効時は何もしない。
+   * useCallback でメモ化して useEffect の依存配列を安定させる。
+   */
+  const refreshTopScores = useCallback(async () => {
+    if (!apiEnabled) return;
+    setTopLoading(true);
+    const records = await getTopScores(10);
+    setTopScores(records);
+    setTopLoading(false);
+  }, [apiEnabled]);
+
+  /**
+   * スタート画面に戻ったタイミング（!isLocked && !cleared）で Top10 を取得する。
+   * cleared 直後（!isLocked && cleared）は別のクリア画面なので取得しない。
+   */
+  useEffect(() => {
+    if (!isLocked && !cleared) {
+      refreshTopScores();
+    }
+  }, [isLocked, cleared, refreshTopScores]);
+
+  /**
+   * クリア時のリセット: 新しいクリアが発生するたび、送信ステータスを idle に戻す。
+   * （前回のクリアで "submitted" になっていた場合に、新セッションのクリアで再送信できるように）
+   */
+  useEffect(() => {
+    if (cleared) {
+      setSubmitStatus("idle");
+    }
+  }, [cleared]);
+
+  /** 送信ボタン押下時のハンドラ */
+  const handleSubmitScore = useCallback(async () => {
+    const trimmed = userName.trim();
+    if (!trimmed) return; // 空名は送らない（ボタン側でも disabled にしている）
+
+    saveUserName(trimmed);
+    setSubmitStatus("submitting");
+
+    const result = await postScore({
+      user_id: trimmed,
+      cleartime: Math.max(0, elapsedTime),
+      // 表示用スコア（タイム/クリアボーナス込み）を送る
+      score: score + Math.max(0, SCORING.TIME_BONUS_BASE - Math.floor(elapsedTime)) + SCORING.CLEAR_BONUS,
+    });
+
+    if (result) {
+      setSubmitStatus("submitted");
+      // 送信成功で Top10 をリフレッシュ（自分の記録が上位なら反映される）
+      refreshTopScores();
+    } else {
+      setSubmitStatus("error");
+    }
+  }, [userName, elapsedTime, score, refreshTopScores]);
 
   const onSfxChange = (e) => {
     const v = Number(e.target.value);
@@ -422,6 +494,50 @@ export default function GameUI({
                   SCORE <span style={{ color: "#fff", marginLeft: "10px" }}>{bestScore}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ===== オンラインランキング Top10（API 有効時のみ） =====
+              VITE_API_BASE が未設定の開発環境では何も表示しない。
+              API が設定されていてもリクエスト失敗時は空配列が返るので、自然にフェードする。 */}
+          {apiEnabled && (
+            <div
+              style={{
+                margin: "15px 0 5px",
+                padding: "10px 12px",
+                background: "rgba(255,170,0,0.06)",
+                border: "1px solid rgba(255,170,0,0.2)",
+                borderRadius: "2px",
+                fontSize: "11px",
+                color: "#bba880",
+                letterSpacing: "1px",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ color: "#ffaa00", marginBottom: "6px", fontSize: "11px", textAlign: "center" }}>
+                ONLINE TOP 10
+              </div>
+              {topLoading && <div style={{ textAlign: "center", color: "#887755" }}>...</div>}
+              {!topLoading && topScores.length === 0 && (
+                <div style={{ textAlign: "center", color: "#887755" }}>NO RECORDS YET</div>
+              )}
+              {!topLoading && topScores.slice(0, 10).map((r, i) => (
+                <div
+                  key={`${r.user_id}_${r.timestamp}_${i}`}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "1px 0",
+                    color: i === 0 ? "#ffee44" : "#bba880",
+                  }}
+                >
+                  <span style={{ width: "20px" }}>{i + 1}.</span>
+                  <span style={{ flex: 1, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.user_id}
+                  </span>
+                  <span style={{ marginLeft: "8px" }}>{formatTime(r.cleartime)}</span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -669,6 +785,111 @@ export default function GameUI({
                   BEST SCORE <span style={{ color: "#fff", marginLeft: "6px" }}>{bestScore}</span>
                 </span>
               )}
+            </div>
+          )}
+
+          {/* ===== オンラインランキング送信フォーム =====
+              API 有効時のみ表示。送信中はボタンが disabled に。
+              キーボード操作で「再挑戦クリック」と競合するのを避けるため、入力 UI は
+              pointerEvents: "auto" に明示し、フォーカス中の Enter で送信できるようにしている。 */}
+          {apiEnabled ? (
+            <div
+              style={{
+                margin: "20px 0 10px",
+                padding: "12px",
+                background: "rgba(255,170,0,0.06)",
+                border: "1px solid rgba(255,170,0,0.2)",
+                borderRadius: "2px",
+                fontSize: "12px",
+                color: "#bba880",
+                letterSpacing: "1px",
+                pointerEvents: "auto",
+              }}
+            >
+              <div style={{ color: "#ffaa00", marginBottom: "8px", textAlign: "center" }}>
+                SUBMIT YOUR SCORE
+              </div>
+              <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value.slice(0, USERNAME_MAX_LENGTH))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && submitStatus === "idle" && userName.trim()) {
+                      handleSubmitScore();
+                    }
+                  }}
+                  placeholder="NAME"
+                  maxLength={USERNAME_MAX_LENGTH}
+                  disabled={submitStatus === "submitting" || submitStatus === "submitted"}
+                  style={{
+                    flex: "1 1 0",
+                    maxWidth: "160px",
+                    padding: "6px 10px",
+                    fontSize: "13px",
+                    fontFamily: "'Courier New', monospace",
+                    letterSpacing: "1px",
+                    background: "rgba(0,0,0,0.5)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,170,0,0.4)",
+                    borderRadius: "2px",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSubmitScore}
+                  disabled={
+                    !userName.trim() ||
+                    submitStatus === "submitting" ||
+                    submitStatus === "submitted"
+                  }
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "12px",
+                    fontFamily: "'Courier New', monospace",
+                    letterSpacing: "1px",
+                    cursor: submitStatus === "idle" && userName.trim() ? "pointer" : "default",
+                    background:
+                      submitStatus === "idle" && userName.trim()
+                        ? "rgba(255,170,0,0.25)"
+                        : "rgba(255,255,255,0.05)",
+                    color:
+                      submitStatus === "idle" && userName.trim() ? "#ffaa00" : "#776655",
+                    border: "1px solid rgba(255,170,0,0.4)",
+                    borderRadius: "2px",
+                  }}
+                >
+                  SEND
+                </button>
+              </div>
+              {/* ステータスメッセージ */}
+              {submitStatus === "submitting" && (
+                <div style={{ marginTop: "8px", textAlign: "center", color: "#88bbff" }}>
+                  送信中...
+                </div>
+              )}
+              {submitStatus === "submitted" && (
+                <div style={{ marginTop: "8px", textAlign: "center", color: "#00ff88" }}>
+                  ✓ 送信完了
+                </div>
+              )}
+              {submitStatus === "error" && (
+                <div style={{ marginTop: "8px", textAlign: "center", color: "#ff8888" }}>
+                  ✗ 送信失敗。ネットワークを確認してください
+                </div>
+              )}
+            </div>
+          ) : (
+            // API 未設定（オフラインモード）の説明
+            <div
+              style={{
+                margin: "16px 0 4px",
+                fontSize: "10px",
+                color: "#776655",
+                letterSpacing: "1px",
+              }}
+            >
+              OFFLINE MODE — ローカル記録のみ
             </div>
           )}
 

@@ -271,8 +271,9 @@ App.setNearItem(closest)
 
 - 壁は必ず `InstancedMesh` のまま維持する。個別 `<mesh>` に変えると数百 fps 落ちる。
 - ライトは PointLight が 20 本を超えると急激に重くなる。松明上限は慎重に。
-- `useFrame` 内で `new THREE.Vector3()` を毎フレーム作るのは GC 圧迫の原因。できれば ref に使い回し用のインスタンスを持たせる（現状は `PlayerController` で一部が毎フレーム new している — 改善余地あり）。
+- `useFrame` 内では `new THREE.Vector3()` をしない。 `PlayerController.jsx` では forward / right / yawDir / 一時計算用の 4 本を `useRef` で保持し、 `.set()` / `.copy()` で使い回す。 アロケーションが必要な新しい毎フレームベクトルを追加する場合も同じパターンで実装する。
 - テクスチャは `useMemo` 必須。毎レンダで CanvasTexture を作ると激重になる。
+- PostFX（`@react-three/postprocessing`）は `multisampling=0` で動かしている。サンプリングを増やすと PS1 のジャギー感が損なわれるうえに重くなる。
 
 ---
 
@@ -311,7 +312,12 @@ App.setNearItem(closest)
 | `src/components/UI/GameUI.jsx` | HUD・タイトル・クリア画面 |
 | `src/components/UI/Minimap.jsx` | ミニマップ（霧の戦場） |
 | `src/components/UI/NearItemIndicator.jsx` | [E] プロンプト |
-| `src/systems/Storage.js` | localStorage 永続化（ベスト記録・難易度・音量） |
+| `src/systems/Storage.js` | localStorage 永続化（ベスト記録・難易度・音量・ユーザ名） |
 | `src/systems/Audio.js` | Web Audio API 手続き合成 SE・BGM |
+| `src/systems/Api.js` | ランキング API クライアント（POST /scores・GET /scores/top）。 `VITE_API_BASE` 未設定時は no-op |
+| `src/components/PostFX.jsx` | PS1 風ポストプロセス（Bloom / Noise / Vignette） |
+| `src/shaders/ps1-vertex.glsl` | 頂点スナッピング GLSL チャンク |
+| `src/shaders/applyPs1VertexSnap.js` | onBeforeCompile で既存マテリアルに頂点スナップを注入するヘルパ |
 | `src/data/config.js` | ゲーム定数 + 難易度プリセット + `applyDifficulty` |
 | `src/styles/App.css` | CRT スキャンライン・ビネット |
+| `tests/MapGenerator.test.js` | `MapGenerator` 純粋関数の Vitest 単体テスト |

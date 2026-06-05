@@ -17,7 +17,7 @@ docs/
 │   ├── PROJECT.md         ← プロジェクトの実装ロードマップ（Phase 順）
 │   └── CAREER.md          ← 開発者本人のキャリア習得計画
 └── infra/                 ← Phase 4 以降の運用・インフラ系ドキュメント置き場
-    └── (将来 INFRA.md, SLO.md, POSTMORTEM.md などを配置)
+    └── IAC_CHOICE.md      ← Phase 5.1 で実施した IaC ツール選定（Terraform 採用）の判断記録
 ```
 
 ---
@@ -31,7 +31,8 @@ docs/
 | `ISSUES.md` | 既知のバグ・不整合・修正方針。**作業前に必ず確認** | コードを書く Claude Code |
 | `roadmap/PROJECT.md` | 今後の実装方針と Phase 順タスクリスト。**作業前に必ず確認** | コードを書く Claude Code / 進捗管理 |
 | `roadmap/CAREER.md` | 本プロジェクトを学習媒体としたキャリア習得計画（SRE/プラットフォームエンジニア転向） | 開発者本人 |
-| `infra/` | AWS 構成図、IaC 方針、SLO 定義、ポストモーテム等の運用ドキュメント | 開発者本人 / 今後の運用作業 |
+| `infra/IAC_CHOICE.md` | IaC ツール選定（Terraform）の判断記録。Phase 5.1 の成果物 | 開発者本人 / 今後の運用作業 |
+| `infra/` 配下（今後） | AWS 構成図、SLO 定義、ポストモーテム等の運用ドキュメント置き場 | 開発者本人 / 今後の運用作業 |
 
 ---
 

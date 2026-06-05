@@ -34,9 +34,15 @@ export default function CollectibleItem({ position, onCollect, id }) {
    * useRef フック:
    * - meshRef: アイテムの3Dメッシュへの参照。回転・スケール変更に使う。
    * - glowRef: グロー用ポイントライトへの参照。明るさの脈動に使う。
+   * - collectedGuardRef: 連打時の多重発火を防ぐ同期フラグ（ISSUES #7）。
+   *   setCollected(true) は state なので反映に再レンダリングを待つが、
+   *   その隙に E キーの keydown が連続発火すると onCollect(id) が複数回呼ばれ、
+   *   スコアが二重加算されることがあった。ref なら同期的に true になるので、
+   *   handleKeyPress の冒頭で早期 return できる。
    */
   const meshRef = useRef();
   const glowRef = useRef();
+  const collectedGuardRef = useRef(false);
 
   /**
    * useState フック:
@@ -107,9 +113,15 @@ export default function CollectibleItem({ position, onCollect, id }) {
   useEffect(() => {
     if (collected) return;
     const handleKeyPress = (e) => {
+      // ref ガード: state 反映前の連打を同期的に弾く（ISSUES #7）
+      if (collectedGuardRef.current) return;
       if (e.key.toLowerCase() !== "e" || !meshRef.current) return;
       const distance = camera.position.distanceTo(new THREE.Vector3(meshRef.current.position.x, camera.position.y, meshRef.current.position.z));
-      if (distance < ITEMS.COLLECT_DISTANCE) { setCollected(true); onCollect(id); }
+      if (distance < ITEMS.COLLECT_DISTANCE) {
+        collectedGuardRef.current = true; // 同期で確定
+        setCollected(true);
+        onCollect(id);
+      }
     };
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);

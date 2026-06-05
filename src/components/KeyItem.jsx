@@ -23,6 +23,8 @@ export default function KeyItem({ position, id, onCollect }) {
   const groupRef = useRef();
   const glowRef = useRef();
   const [collected, setCollected] = useState(false);
+  // 連打時の多重発火ガード（ISSUES #7）。詳細は CollectibleItem.jsx の同名 ref のコメント参照。
+  const collectedGuardRef = useRef(false);
   const { camera } = useThree();
 
   useFrame((state) => {
@@ -60,6 +62,8 @@ export default function KeyItem({ position, id, onCollect }) {
   useEffect(() => {
     if (collected) return;
     const handleKeyPress = (e) => {
+      // ref ガード: state 反映前の連打を同期的に弾く（ISSUES #7）
+      if (collectedGuardRef.current) return;
       if (e.key.toLowerCase() !== "e" || !groupRef.current) return;
       const dist = camera.position.distanceTo(
         new THREE.Vector3(
@@ -69,6 +73,7 @@ export default function KeyItem({ position, id, onCollect }) {
         )
       );
       if (dist < ITEMS.COLLECT_DISTANCE) {
+        collectedGuardRef.current = true; // 同期で確定
         setCollected(true);
         onCollect(id);
       }

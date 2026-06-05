@@ -20,6 +20,10 @@ const NS = "ps1game:";
 const KEY_BEST_TIME = NS + "bestTime";
 const KEY_BEST_SCORE = NS + "bestScore";
 const KEY_DIFFICULTY = NS + "difficulty";
+const KEY_USERNAME = NS + "username";
+
+/** ランキング送信時に使う表示名の最大長。Lambda 側のバリデーション（64 文字）より厳しめに設ける */
+export const USERNAME_MAX_LENGTH = 12;
 
 // 難易度ごとに別のベスト記録を保持するため、難易度サフィックスを付ける
 const bestTimeKey = (difficulty) => KEY_BEST_TIME + ":" + difficulty;
@@ -157,6 +161,39 @@ export function saveDifficulty(difficulty) {
   if (!isAvailable()) return;
   try {
     localStorage.setItem(KEY_DIFFICULTY, difficulty);
+  } catch {
+    // 無視
+  }
+}
+
+/**
+ * 直近に使ったランキング表示名を取得する。
+ * @returns {string} 未保存または不正値なら空文字
+ */
+export function getSavedUserName() {
+  if (!isAvailable()) return "";
+  try {
+    const raw = localStorage.getItem(KEY_USERNAME);
+    if (typeof raw !== "string") return "";
+    return raw.slice(0, USERNAME_MAX_LENGTH);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * ランキング表示名を保存する。空文字なら削除。
+ * @param {string} name
+ */
+export function saveUserName(name) {
+  if (!isAvailable()) return;
+  try {
+    const trimmed = (name || "").trim().slice(0, USERNAME_MAX_LENGTH);
+    if (trimmed) {
+      localStorage.setItem(KEY_USERNAME, trimmed);
+    } else {
+      localStorage.removeItem(KEY_USERNAME);
+    }
   } catch {
     // 無視
   }
