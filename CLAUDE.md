@@ -48,6 +48,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 迷ったらユーザに `/next-task` skill を提案してください（`.claude/skills/next-task/SKILL.md`）。 ROADMAP と ISSUES を突き合わせて候補を抽出します。
 
+### ⚠️ PS1 表現（Phase 3）に触る場合は必読
+
+**頂点スナップ / アフィンテクスチャマッピング / dither / fog / dpr 等、見た目に関わる変更を**
+**提案・実装する前に `docs/PS1_REDESIGN.md` を必ず通読してください。** 過去セッションで
+複数回ユーザ却下を受けた失敗パターン（禁忌）、現在進行中の 6 ステップ計画、各 Step の
+状態と次にやるべきこと、チューニングノブの一覧が集約されています。 ここを読まずに
+PS1 風の効果を新規提案すると、ほぼ確実に過去の失敗を踏襲します。
+
 ## このプロジェクト専用 Skills
 
 `.claude/skills/` 配下にプロジェクト固有のスキルがあります。
@@ -64,6 +72,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |----------|------|
 | `docs/README.md` | docs/ 全体の索引と階層構造の説明 |
 | `docs/ARCHITECTURE.md` | ゲーム全体のアーキテクチャ・状態管理・データフローの詳細 |
+| `docs/PS1_REDESIGN.md` | **PS1 表現パイプライン再設計の作業計画・失敗履歴・禁忌。 Phase 3 に触る前に必読** |
 | `docs/roadmap/PROJECT.md` | 今後の実装方針と優先度付きタスクリスト（Phase 順） |
 | `docs/roadmap/CAREER.md` | 本プロジェクトを学習媒体としたキャリア習得計画（SRE 転向） |
 | `docs/ISSUES.md` | 既知の不具合・壊れているコード・修正が必要な箇所 |
@@ -162,5 +171,5 @@ WASD と Shift は `PlayerController.jsx` 内で `document` に直接 keydown/ke
 
 1. **AWS バックエンドはまだ存在しない。** Lambda（`lambda/src/handler.ts`）とフロント側送信コード（`src/systems/Api.js`、`GameUI.jsx` のクリア画面）は揃っているが、API Gateway / Lambda 実体 / DynamoDB テーブルは未構築。 `VITE_API_BASE` 未設定なので `Api.js` は no-op として動き、フロントは「オフラインモード」表示になる。Phase 4.1〜4.3 で構築する。
 2. **IaC・CI/CD・SRE は未着手。** `*.tf`、`.github/workflows/`、`docs/infra/INFRA.md` は未だ無い。 IaC ツールは Terraform で確定済（`docs/infra/IAC_CHOICE.md`）。 Phase 5〜7 で段階的に整備する。
-3. **`src/shaders/` には頂点スナップだけが入っている。** Phase 3.1 の最小実装として `ps1-vertex.glsl` と `applyPs1VertexSnap.js` を追加し、 `Structure.jsx` の壁に適用済。 アフィンテクスチャマッピング（Phase 3.2）は未実装。
+3. **`src/shaders/` には DitherEffect だけが入っている（PS1 表現は方針転換済み）。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は **試行後に不採用** ─ カメラ移動でテクスチャや頂点が揺れる動的アーティファクトが「ストレス要素にしか見えない」とユーザに却下された。Bloodborne PSX 的な「**動的アーティファクトに頼らない静的ローファイ感**」を目指す方針に変更。代替として `src/shaders/DitherEffect.js`（Bayer 4x4 順序ディザ + 5-bit カラー量子化）を `PostFX.jsx` の EffectComposer 最終段に追加し、空間的縞模様で PS1 感を出している。詳細経緯は `docs/roadmap/PROJECT.md` Milestone 3.1 / 3.2 のメモ。
 4. **`PostFX.jsx` は薄めの設定。** Bloom / Noise / Vignette を控えめに重ねている。重い・崩れる場合は `PostFX.jsx` の `ENABLED = false` または `App.jsx` の `<PostFX />` を外す。

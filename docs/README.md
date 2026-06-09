@@ -11,6 +11,7 @@
 docs/
 ├── README.md              ← 本ファイル。各ドキュメントへの索引
 ├── ARCHITECTURE.md        ← ゲーム本体の設計詳細（リファレンス）
+├── PS1_REDESIGN.md        ← PS1 表現パイプライン再設計（複数セッション継続作業）
 ├── CONVENTIONS.md         ← コーディング規約・命名ルール
 ├── ISSUES.md              ← 既知の不具合・修正待ち項目
 ├── roadmap/
@@ -27,6 +28,7 @@ docs/
 | ファイル | 用途 | 主な読者 |
 |----------|------|---------|
 | `ARCHITECTURE.md` | 状態管理・ダンジョン生成・描画・UI の設計詳細 | コードを書く Claude Code / 設計を理解したい開発者 |
+| `PS1_REDESIGN.md` | PS1 表現パイプライン再設計の作業計画・失敗履歴・禁忌・現在地。 **Phase 3（見た目）に触る作業前に必ず通読** | コードを書く Claude Code（複数セッション継続） |
 | `CONVENTIONS.md` | コメント言語・命名・React/R3F の書き方・ESLint ルール | コードを書く Claude Code |
 | `ISSUES.md` | 既知のバグ・不整合・修正方針。**作業前に必ず確認** | コードを書く Claude Code |
 | `roadmap/PROJECT.md` | 今後の実装方針と Phase 順タスクリスト。**作業前に必ず確認** | コードを書く Claude Code / 進捗管理 |

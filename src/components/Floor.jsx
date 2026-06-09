@@ -54,6 +54,10 @@ export default function Floor({ gridW, gridH, cellSize }) {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
       <planeGeometry args={[width, depth]} />
+      {/* 床はダンジョン全体を 1 枚 4 頂点で覆っているため、頂点スナップを掛けると
+          カメラ移動時に角の頂点が量子化格子を跨ぐたびに面全体が波打って見える。
+          代わりに NearestFilter + Fog + PostFX で PS1 感を出している（詳細は
+          docs/roadmap/PROJECT.md の Milestone 3.1 のメモを参照）。 */}
       <meshStandardMaterial map={texture} roughness={0.95} metalness={0} />
     </mesh>
   );

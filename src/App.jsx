@@ -231,9 +231,35 @@ function DungeonScene({ dungeon, onItemCollect, onKeyCollect, heldKeys, isLocked
  * 3. HTML UI（GameUI, Minimap, NearItemIndicator）
  * 4. ゲームのライフサイクル（開始、プレイ中、クリア、リスタート）
  */
+/**
+ * PS1 内部レンダー解像度の目標横ピクセル数。
+ * PS1 native は 320〜640 の範囲だったので、その中間値として 480 を採用。
+ * R3F の dpr は「CSS 画面幅 × dpr = 実レンダー幅」なので、画面幅から逆算する。
+ * Phase 3 redesign Step 1: 高解像度のまま PS1 風効果を上に乗せると不自然になる問題を
+ * 解消するため、まず内部解像度を PS1 域に固定して土台を作る。
+ *
+ * 数値を変えるなら以下を目安に:
+ *   - 320 : 最もチャンキー（PS1 SD output の下限相当、Silent Hill 等）
+ *   - 480 : 中間値（推奨初期値）
+ *   - 640 : 控えめ（PS1 高解像度モード相当、文字が読みやすい）
+ */
+const PS1_TARGET_WIDTH = 480;
+
 export default function App() {
   // ===== ゲーム状態（useState）=====
   // useState の値が変わると、コンポーネントが再レンダリングされる
+
+  /**
+   * 内部レンダー解像度を PS1 域に固定するための dpr。
+   * 画面が広いほど低 dpr（強くダウンサンプル）になる。
+   * 旧 dpr=0.65 は CRT 風の軽い縮小に過ぎず、modern 高解像度のまま PS1 風効果を載せても
+   * 浮いてしまう問題があったため、PS1_TARGET_WIDTH を基準に再計算する。
+   * 上限 0.65 は元の値を維持してそれより悪化させないためのクランプ。
+   */
+  const ps1Dpr = useMemo(() => {
+    if (typeof window === "undefined") return 0.5;
+    return Math.min(0.65, PS1_TARGET_WIDTH / window.innerWidth);
+  }, []);
 
   // シード値: ダンジョン生成の種。変更するたびに新しいダンジョンが生成される
   // () => Date.now() は初期値を遅延評価する（初回のみ実行される）
@@ -596,7 +622,7 @@ export default function App() {
       <Canvas
         camera={{ position: [dungeon.startPos.x, dungeon.startPos.y, dungeon.startPos.z], fov: 75, near: 0.1, far: 40 }}
         gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
-        dpr={0.65}
+        dpr={ps1Dpr}
       >
         {/* PointerLockControls: クリックでマウスカーソルをロックし、FPS風の視点操作を有効にする。
             minPolarAngle / maxPolarAngle で上下の視点移動範囲を制限（真上・真下は見られないように） */}

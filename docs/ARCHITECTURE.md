@@ -173,10 +173,11 @@ if (!checkGridCollision(newPosZ, ...)) camera.position.z = newPosZ.z;
 - 壁ごとに少しだけ色をずらす（`instancedBufferAttribute` の `Float32Array` に RGB を詰める）。
 - テクスチャは `TextureGenerator.js` の `generateStoneWallTexture(seed)` が Canvas で手続き生成。
 - `NearestFilter` でテクスチャ補間を切ってレトロ感。
+- 頂点スナップは適用しない（カメラ移動で揺れて違和感が出るため不採用。詳細は `roadmap/PROJECT.md` Milestone 3.1）。PS1 感は PostFX の Dither + NearestFilter + Fog で出す。
 
 ### 4.3 床・天井（`Floor.jsx` / `Ceiling.jsx`）
 
-- それぞれ 1 枚の平面。
+- それぞれダンジョン全体を覆う 1 枚の平面（`planeGeometry(width, depth)` で頂点 4 個）。
 - テクスチャは `generateStoneFloorTexture` / `generateCeilingTexture` を利用。
 
 ### 4.4 松明（`Torch.jsx`）
@@ -282,7 +283,7 @@ App.setNearItem(closest)
 - **Lambda バックエンドとは未接続。** スコアランキング API（`lambda/src/handler.ts`）は実装済みだが、フロント側からの送信コードが未実装。`roadmap/PROJECT.md` の Phase 4.2 で接続予定（`ISSUES.md` #15）。
 - **設定 UI（音量・感度等）なし。** Audio システム自体は実装済み（`src/systems/Audio.js`）だが、UI からの調整手段は未整備。
 - **AWS 公開・IaC・CI/CD は全て未着手。** S3+CloudFront 配信、Terraform 等の IaC、GitHub Actions、CloudWatch SRE は新 ROADMAP の Phase 4〜7 で段階的に整備する計画（`roadmap/PROJECT.md`）。
-- **PS1 表現の深化（vertex snapping / アフィンテクスチャ / postprocessing）は未着手。** `src/shaders/` は `.gitkeep` のみ。Phase 3 で対応予定。
+- **PS1 表現は方針転換済み。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は試行後に**不採用**（動的アーティファクトが不快だったため）。現行の PS1 表現は: NearestFilter + Fog + `PostFX.jsx`（Bloom / Noise / Vignette / **Dither**）。Dither は `src/shaders/DitherEffect.js` の Bayer 4x4 順序ディザ + 5-bit カラー量子化で、Bloodborne PSX 的な静的ローファイ感を担う。詳細は `roadmap/PROJECT.md` Milestone 3 のメモ参照。
 
 過去の制限のうち、現在は解決済みのもの（参考）:
 
@@ -315,9 +316,8 @@ App.setNearItem(closest)
 | `src/systems/Storage.js` | localStorage 永続化（ベスト記録・難易度・音量・ユーザ名） |
 | `src/systems/Audio.js` | Web Audio API 手続き合成 SE・BGM |
 | `src/systems/Api.js` | ランキング API クライアント（POST /scores・GET /scores/top）。 `VITE_API_BASE` 未設定時は no-op |
-| `src/components/PostFX.jsx` | PS1 風ポストプロセス（Bloom / Noise / Vignette） |
-| `src/shaders/ps1-vertex.glsl` | 頂点スナッピング GLSL チャンク |
-| `src/shaders/applyPs1VertexSnap.js` | onBeforeCompile で既存マテリアルに頂点スナップを注入するヘルパ |
+| `src/components/PostFX.jsx` | PS1 風ポストプロセス（Bloom / Noise / Vignette / Dither） |
+| `src/shaders/DitherEffect.js` | postprocessing の Effect サブクラス。Bayer 4x4 順序ディザ + 5-bit カラー量子化 |
 | `src/data/config.js` | ゲーム定数 + 難易度プリセット + `applyDifficulty` |
 | `src/styles/App.css` | CRT スキャンライン・ビネット |
 | `tests/MapGenerator.test.js` | `MapGenerator` 純粋関数の Vitest 単体テスト |

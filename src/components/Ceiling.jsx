@@ -54,6 +54,8 @@ export default function Ceiling({ gridW, gridH, cellSize, wallHeight }) {
   return (
     <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, wallHeight, 0]}>
       <planeGeometry args={[width, depth]} />
+      {/* 床と同じく 4 頂点の巨大平面なので頂点スナップは適用しない（適用すると面全体が
+          波打って見える）。詳細は docs/roadmap/PROJECT.md の Milestone 3.1 のメモを参照。 */}
       <meshStandardMaterial map={texture} side={THREE.DoubleSide} roughness={1} metalness={0} />
     </mesh>
   );
