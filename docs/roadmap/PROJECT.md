@@ -50,12 +50,12 @@ Claude Code は **Phase 順** に進めることを推奨します。緊急度�
 > **重要**: 本 Phase の作業は `docs/PS1_REDESIGN.md` の 6 ステップ計画に沿って **複数セッションをまたいで段階的に検証** する方針に切り替わっている（2026-06-08〜）。 各 Milestone 個別ではなく、再設計ドキュメントを単一の真実の源とする。 新しい提案を出す前に必ず `docs/PS1_REDESIGN.md` を通読すること（失敗履歴と禁忌が集約されている）。
 
 ### Milestone 3.1: 頂点スナッピング
-- [-] **不採用**（2026-06-08 試行・撤回 → 全廃）。`src/shaders/ps1-vertex.glsl` + `applyPs1VertexSnap` を実装し壁・敵・罠・トーチ・小物まで段階的に展開したが、ユーザレビューで「壁がぐらぐら不安定に揺れて違和感のほうが勝つ」「PS1 らしさと言えば聞こえはいいがストレス要素にも見える」と却下された。Bloodborne PSX のような「**動的アーティファクトに頼らない静的ローファイ感**」を目指す方針に転換し、シェーダ 2 ファイルとコンポーネント側 onUpdate を全て削除。代替として 3.3 に Dither エフェクトを追加し、空間的縞模様（5-bit カラー量子化）で PS1 感を出している。
+- [-] **不採用**（2026-06-08 試行・撤回 → 全廃）。`src/shaders/ps1-vertex.glsl` + `applyPs1VertexSnap` を実装し壁・敵・罠・トーチ・小物まで段階的に展開したが、ユーザレビューで「壁がぐらぐら不安定に揺れて違和感のほうが勝つ」「PS1 らしさと言えば聞こえはいいがストレス要素にも見える」と却下された。Bloodborne PSX のような「**動的アーティファクトに頼らない静的ローファイ感**」を目指す方針に転換し、シェーダ 2 ファイルとコンポーネント側 onUpdate を全て削除。 現在の PS1 表現は内部レンダー解像度のダウンサンプル（`src/App.jsx` `PS1_TARGET_WIDTH=480` / `ps1Dpr`）＋ `NearestFilter` ＋ Fog ＋ 薄い PostFX で担う（詳細は `PS1_REDESIGN.md` Step 1 / `CLAUDE.md` 設計上の落とし穴 3）。
 ### Milestone 3.2: アフィンテクスチャマッピング
 - [-] **不採用**（2026-06-08 試行・撤回）。`?raw` 経由で `ps1-affine.glsl` と `applyPs1AffineTexture` を実装し壁・床・天井に注入したが、頂点スナップが `gl_Position.xy` を量子化するためカメラ移動中に頂点が離散的に飛び、それに連動してアフィン UV も飛んで「テクスチャが波打つ／縮小する」不安定な見え方になった。頂点スナップ自体も 3.1 で全廃したため、アフィン単体での再挑戦も方針として保留。
 ### Milestone 3.3: ポストプロセス
 - [x] `@react-three/postprocessing` 導入。`src/components/PostFX.jsx` に Bloom / Noise / Vignette を薄く重ねる構成で実装。CRT 湾曲は CSS スキャンライン＋ビネットで既に表現できているので postprocess 側では入れていない
-- [x] **Dither エフェクト追加**（2026-06-08）。`src/shaders/DitherEffect.js` に Bayer 4x4 順序ディザ + 5-bit カラー量子化（`levels=32`、`strength=0.85`）を実装し、EffectComposer の最終段に置いて Bloom/Noise/Vignette を含む合成後の画面に縞模様を載せる。Bloodborne PSX のような「R5G6B5 風出力」の質感を狙ったもので、頂点スナップを全廃した代わりの PS1 表現の中核。
+- 注: 過去（2026-06-08）に Bayer 4x4 順序ディザ + 5-bit カラー量子化を `EffectComposer` 最終段に載せて試行したが、「ブロックノイズに近く PS1 再現になっていない」と却下され撤退（`PS1_REDESIGN.md §3 禁忌 #4`）。 ディザの再挑戦は同 `§2 Step 5` で **低解像度 RT に直接掛ける方針** で計画中（未実装）。
 
 ---
 
