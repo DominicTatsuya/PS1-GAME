@@ -9,7 +9,7 @@
 
 本作は **React 19 + @react-three/fiber + Three.js** で構築された、一人称視点の 3D ダンジョン探索ゲームです。
 
-- Lambda バックエンド（スコアランキング API）は `lambda/` 配下に実装済みだが、フロント側の送信コードは未実装のため事実上未接続。Phase 4.2 で接続予定（`roadmap/PROJECT.md`・`ISSUES.md` #15）
+- Lambda バックエンド（スコアランキング API）は `lambda/` 配下に、フロント側の送信コード（`Api.js`）も実装済み（`ISSUES.md` #15 解決済み）。未構築なのは AWS 側のインフラ実体（API Gateway / Lambda デプロイ / DynamoDB テーブル）のみ。構築手順は `docs/infra/INFRA.md`
 - SPA。ルーティング無し
 - 画面遷移はゲーム状態（`isLocked` / `cleared`）で切り替わる
 
@@ -173,7 +173,7 @@ if (!checkGridCollision(newPosZ, ...)) camera.position.z = newPosZ.z;
 - 壁ごとに少しだけ色をずらす（`instancedBufferAttribute` の `Float32Array` に RGB を詰める）。
 - テクスチャは `TextureGenerator.js` の `generateStoneWallTexture(seed)` が Canvas で手続き生成。
 - `NearestFilter` でテクスチャ補間を切ってレトロ感。
-- 頂点スナップは適用しない（カメラ移動で揺れて違和感が出るため不採用。詳細は `roadmap/PROJECT.md` Milestone 3.1）。PS1 感は内部レンダー解像度のダウンサンプル（`src/App.jsx` の `PS1_TARGET_WIDTH=480` / `ps1Dpr`）＋ `NearestFilter` ＋ Fog ＋ 薄い PostFX（Bloom / Noise / Vignette）で出す。
+- 頂点スナップは適用しない（過去に試行しユーザ却下済み。詳細と再挑戦の条件は `docs/PS1_REDESIGN.md`）。PS1 感は内部レンダー解像度のダウンサンプル（`src/App.jsx` の `PS1_TARGET_WIDTH=480` / `ps1Dpr`）＋ `NearestFilter` ＋ Fog ＋ 薄い PostFX（Bloom / Noise / Vignette）で出す。
 
 ### 4.3 床・天井（`Floor.jsx` / `Ceiling.jsx`）
 
@@ -184,7 +184,7 @@ if (!checkGridCollision(newPosZ, ...)) camera.position.z = newPosZ.z;
 
 - 各松明は壁面に貼り付く形で配置（`wallDirs` から壁方向を決定）。
 - `pointLight` を持ち、`useFrame` 内で `intensity` をランダムに揺らして炎の演出。
-- **最大 15〜25 本まで** に制限されているのは、WebGL の動的ライト数上限への配慮。
+- 分岐点・行き止まり・直線通路の一部を候補にし、互いにマンハッタン距離5以上離れるようフィルタしたうえで、難易度別の上限（`TORCH.MAX_COUNT`、Normal/Easy=30・Hard=20）まで配置。WebGL の動的ライト数上限への配慮でこの上限を設けている。
 
 ### 4.5 プレイヤーランタン（`PlayerController.jsx` 内）
 
@@ -280,10 +280,10 @@ App.setNearItem(closest)
 
 ## 9. 既知の設計上の妥協・制限
 
-- **Lambda バックエンドとは未接続。** スコアランキング API（`lambda/src/handler.ts`）は実装済みだが、フロント側からの送信コードが未実装。`roadmap/PROJECT.md` の Phase 4.2 で接続予定（`ISSUES.md` #15）。
+- **AWS インフラは未構築。** Lambda・フロント送信コードは実装済み（§1 参照）。API Gateway / Lambda 実体 / DynamoDB テーブルが未構築で、構築手順は `docs/infra/INFRA.md` にまとめてある。
 - **設定 UI（音量・感度等）なし。** Audio システム自体は実装済み（`src/systems/Audio.js`）だが、UI からの調整手段は未整備。
-- **AWS 公開・IaC・CI/CD は全て未着手。** S3+CloudFront 配信、Terraform 等の IaC、GitHub Actions、CloudWatch SRE は新 ROADMAP の Phase 4〜7 で段階的に整備する計画（`roadmap/PROJECT.md`）。
-- **PS1 表現は方針転換済み。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は試行後に**不採用**（動的アーティファクトが不快だったため）。現行の PS1 表現は: 内部レンダー解像度のダウンサンプル（`src/App.jsx` の `PS1_TARGET_WIDTH=480` / `ps1Dpr`）＋ `NearestFilter` ＋ Fog ＋ `PostFX.jsx`（Bloom / Noise / Vignette）。 ディザは過去試行→却下されており未実装。 計画と禁忌は `roadmap/PROJECT.md` Milestone 3 および `PS1_REDESIGN.md`。
+- **AWS 公開・IaC・CI/CD は全て未着手。** S3+CloudFront 配信・DynamoDB 等の手動構築手順は `docs/infra/INFRA.md` に整備済みだが実施はこれから。Terraform 等の IaC、GitHub Actions、CloudWatch SRE は新 ROADMAP の Phase 5〜7 で段階的に整備する計画（`roadmap/PROJECT.md`）。
+- **PS1 表現は方針転換済み。** Phase 3.1（頂点スナップ）・3.2（アフィンテクスチャ）は試行後に不採用、ディザも過去試行→却下されており未実装。現行の PS1 表現の構成要素・進行中の再設計計画・禁忌は `docs/PS1_REDESIGN.md` に一本化（単一の真実の源）。
 
 過去の制限のうち、現在は解決済みのもの（参考）:
 

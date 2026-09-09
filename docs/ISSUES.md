@@ -111,6 +111,8 @@ Vitest を導入し、`MapGenerator` の純粋関数群（同 seed の再現性 
 
 Phase 3.1（頂点スナッピング）の最小実装として `src/shaders/ps1-vertex.glsl` と `src/shaders/applyPs1VertexSnap.js` を追加。`onBeforeCompile` で `meshStandardMaterial` に注入する形にして既存のライティングを温存。`src/components/Structure.jsx` の壁マテリアルに適用済み。
 
+**追記（2026-06-08）**: この実装はその後のセッションでユーザ却下・削除された（禁忌化）。現在 `Structure.jsx` に頂点スナップは適用されていない。`src/shaders/` は再び空ディレクトリに戻っている。詳細は `docs/PS1_REDESIGN.md` §2 Step 3 / §3 禁忌を参照。
+
 ### ~~Issue #6 — `useFrame` 内で `new THREE.Vector3()` を毎フレーム生成~~（2026-06-05 解決）
 
 `PlayerController.jsx` の `forward` / `right` / `dir` / アイテム/鍵/出口距離計算用の一時 Vector3 を `useRef` ベースの使い回しに変更。定数の上方向ベクトルは `UP_VECTOR` としてモジュールスコープへ抽出。`useFrame` 内のアロケーションがゼロに。

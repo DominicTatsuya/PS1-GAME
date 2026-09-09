@@ -40,13 +40,14 @@
 - 出口到達でダンジョンクリア
 
 ### レンダリング環境（PS1風表現）
-- 低解像度レンダリング（dpr: 0.65）によるピクセル化
+- 内部レンダー解像度を PS1 域まで下げるダウンサンプル（画面幅に応じて動的計算した `dpr`、上限 0.65）
 - アンチエイリアス無効化
 - フラットシェーディング
+- ポストプロセス（Bloom / Noise / Vignette を薄く重ねる、`@react-three/postprocessing`）
 - CRTスキャンライン・ビネット効果（CSSオーバーレイ）
-- フォグエフェクト（距離2-20）
+- フォグエフェクト（距離8〜32）
 - プレイヤーランタン（カメラ追従ポイントライト）
-- 松明（揺らぎアニメーション付きポイントライト × 最大15本）
+- 松明（揺らぎアニメーション付きポイントライト、難易度により最大20〜30本）
 
 ### ダンジョンビジュアル
 - **壁**: Canvas手続き生成テクスチャ — 石積みブロック・目地線・苔パッチ・ツタ（蔦）・経年劣化表現
@@ -54,6 +55,20 @@
 - **天井**: 粗い岩肌テクスチャ — ひび割れ・苔の痕跡
 - InstancedMesh によるインスタンス描画（壁ブロック数百個を高速レンダリング）
 - インスタンスごとの色バリエーション（暖色/寒色のランダムチント）
+
+### 世界観・ゲームプレイ要素
+- 開閉ドアと鍵（対応する鍵を所持していないと開かない）
+- スパイクトラップ（周期的に発動、踏むとスタミナ減少）
+- 敵 AI（視界内のプレイヤーを BFS 経路で追跡、攻撃範囲でスタミナ減少）
+- 難易度選択（Easy / Normal / Hard、迷路サイズ・アイテム数・松明数・敵数などが変化）
+- スコア・ベスト記録の `localStorage` 永続化（難易度別）
+- Web Audio API による効果音・BGM（手続き合成、音声ファイル無し）
+
+### オンラインランキング（サーバーレスバックエンド、AWS 側は未構築）
+- クリア画面からのスコア送信 UI、スタート画面の Online Top10 表示は実装済み（`src/systems/Api.js` / `GameUI.jsx`）
+- バックエンドは Lambda + DynamoDB（`lambda/`）としてコード実装済みだが、AWS 側のインフラ実体（API Gateway / Lambda デプロイ / DynamoDB テーブル）は未構築
+- `VITE_API_BASE` が未設定の間はオフラインモードとして動作（スコア送信・Top10 表示をスキップ）
+- 構築手順は `docs/infra/INFRA.md` を参照
 
 ### UIシステム
 - **HUD**: スコア・アイテム数・経過タイマー
@@ -80,29 +95,43 @@ PS1-GAME/
 │   │   ├── App.css                 # CRTスキャンライン・ビネット・ピクセル化
 │   │   └── index.css               # グローバルスタイル
 │   ├── data/
-│   │   └── config.js               # ゲーム定数（迷路・プレイヤー・スコア・松明設定）
-│   ├── shaders/                    # シェーダー実装用（将来拡張）
+│   │   └── config.js               # ゲーム定数 + 難易度プリセット（applyDifficulty）
+│   ├── shaders/                    # 現状空ディレクトリ（PS1シェーダー実験は試行後に不採用、docs/PS1_REDESIGN.md 参照）
 │   ├── systems/
 │   │   ├── MapGenerator.js         # 迷路生成・BFS・衝突判定・座標変換
-│   │   └── TextureGenerator.js     # 手続きテクスチャ生成（石壁・石畳・天井）
+│   │   ├── TextureGenerator.js     # 手続きテクスチャ生成（石壁・石畳・天井）
+│   │   ├── Storage.js              # localStorage永続化（ベスト記録・難易度・ユーザ名）
+│   │   ├── Audio.js                # Web Audio API 手続き合成 SE・BGM
+│   │   └── Api.js                  # ランキング API クライアント（VITE_API_BASE 未設定時は no-op）
 │   ├── components/
 │   │   ├── PlayerController.jsx    # プレイヤー移動・ランタン・コンパス・探索追跡
 │   │   ├── CollectibleItem.jsx     # 収集アイテム（発光・パルス・Eキー収集）
+│   │   ├── KeyItem.jsx             # 鍵アイテム（ドアを開ける）
+│   │   ├── Door.jsx                # 開閉ドア
+│   │   ├── Trap.jsx                # スパイクトラップ
+│   │   ├── Enemy.jsx               # 敵AI（BFS追跡）
 │   │   ├── Structure.jsx           # InstancedMesh壁描画
 │   │   ├── Floor.jsx               # 石畳テクスチャ床
 │   │   ├── Ceiling.jsx             # 岩肌テクスチャ天井
 │   │   ├── Torch.jsx               # 松明（揺らぎライト・炎メッシュ）
 │   │   ├── Goal.jsx                # 出口ポータル（トーラス・活性化エフェクト）
+│   │   ├── PostFX.jsx              # PS1風ポストプロセス（Bloom/Noise/Vignette）
 │   │   └── UI/
-│   │       ├── GameUI.jsx          # HUD・スタート画面・クリア画面・コンパス
+│   │       ├── GameUI.jsx          # HUD・スタート画面（Online Top10）・クリア画面（スコア送信）・コンパス
 │   │       ├── NearItemIndicator.jsx # アイテム接近プロンプト
 │   │       └── Minimap.jsx         # ミニマップ（霧の戦場・Mキー拡大・方向矢印）
 │   └── assets/
 │       └── react.svg
+├── lambda/                         # スコアランキング用サーバーレスバックエンド（AWS側は未構築、docs/infra/INFRA.md 参照）
+│   ├── src/handler.ts              # POST /scores・GET /scores/top
+│   └── DYNAMODB.md                 # テーブルスキーマ・GSI・CLI作成例
+├── tests/
+│   └── MapGenerator.test.js        # Vitest 単体テスト
 ├── index.html
 ├── vite.config.js                  # Vite設定（チャンクサイズ警告閾値含む）
 ├── eslint.config.js
 ├── tsconfig.json
+├── .env.example                    # VITE_API_BASE 等の環境変数サンプル
 ├── package.json
 └── README.md
 ```
@@ -117,6 +146,7 @@ PS1-GAME/
 | **3D描画** | Three.js | ^0.180.0 | WebGL描画・3D数学 |
 | **React統合** | @react-three/fiber | ^9.4.0 | Three.jsのReactバインディング |
 | **3Dユーティリティ** | @react-three/drei | ^10.7.6 | PointerLockControls等 |
+| **ポストプロセス** | @react-three/postprocessing | - | Bloom / Noise / Vignette |
 | **ビルドツール** | Vite (rolldown-vite) | 7.1.14 | 開発サーバー・バンドル |
 | **リンター** | ESLint | ^9.36.0 | コード品質チェック |
 | **パッケージ管理** | npm | - | 依存関係管理 |
@@ -126,7 +156,7 @@ PS1-GAME/
 - **迷路生成**: Recursive Backtracker + mulberry32シード乱数
 - **衝突判定**: グリッドベース Circle-vs-AABB（X/Z軸独立判定）
 - **レンダリング**: WebGL2、InstancedMesh、Canvas手続き生成テクスチャ
-- **PS1表現**: dpr=0.65、NearestFilter、flatShading、CSSスキャンライン
+- **PS1表現**: 画面幅に応じた動的dpr（上限0.65）、NearestFilter、flatShading、CSSスキャンライン
 - **パフォーマンス**: `high-performance` パワープリファレンス、InstancedMesh
 - **フレーム更新**: `useFrame` フックによるリアルタイム更新
 
@@ -199,19 +229,14 @@ npm run lint
 ## 💡 今後の拡張アイデア
 
 ### 技術的改善
-- 頂点スナッピングによるPS1風のポリゴン歪み再現
-- カスタムシェーダーによるCRT風フィルター・カラーリミット
-- ポストプロセスエフェクト（ノイズ、カラーバンディング）
+- カスタムシェーダーによるCRT風フィルター・カラーリミット（ディザリングは試行の上で一旦不採用。再挑戦の計画は `docs/PS1_REDESIGN.md` 参照）
 
 ### ゲームプレイ要素
-- 動的オブジェクト（移動する障害物・敵）
 - 複数フロア / レベルシステム
-- タイムアタックモード（ベストタイム保存）
-- `localStorage` によるスコア・プレイデータ永続化
+- タイムアタックモード（ベストタイムは保存済みだが、専用モードとしては未実装）
 
-### オーディオ
-- Web Audio APIによる効果音（足音・アイテム取得・ポータル）
-- 環境音・BGM
+### インフラ・運用
+- AWS へのランキング API 実デプロイ（手順は `docs/infra/INFRA.md`）、Terraform による IaC 化、CI/CD、監視・SLO
 
 ### リファクタリング
 - TypeScriptへの移行

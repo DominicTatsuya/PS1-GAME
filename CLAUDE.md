@@ -42,9 +42,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 新しいセッションを始めるときは、次の順で context を回収してください。
 
 1. **このファイル（CLAUDE.md）を最後まで読む** — プロジェクト全体像と作業方針
-2. **`docs/ISSUES.md` を確認** — 未解決の不具合や保留中の課題があるか
-3. **`docs/roadmap/PROJECT.md` で次に着手すべき Phase / Milestone を確認** — 未チェックのチェックボックスが現在の作業候補
-4. **`git log --oneline -10` で直近の commit メッセージを確認** — 進行中の流れを掴む
+2. **`docs/HANDOFF.md` を読む** — Phase 進捗・今アクティブな作業・既知のブロッカーを 1 ファイルで把握できる状況スナップショット
+3. 個別の深掘りが必要なら `docs/ISSUES.md`（不具合詳細）・`docs/roadmap/PROJECT.md`（Milestone 詳細）・`git log --oneline -10`（直近の commit）を確認
 
 迷ったらユーザに `/next-task` skill を提案してください（`.claude/skills/next-task/SKILL.md`）。 ROADMAP と ISSUES を突き合わせて候補を抽出します。
 
@@ -70,14 +69,17 @@ PS1 風の効果を新規提案すると、ほぼ確実に過去の失敗を踏�
 
 | ファイル | 用途 |
 |----------|------|
+| `docs/HANDOFF.md` | **現状スナップショット（Phase 進捗・アクティブな作業・既知のブロッカー）。新セッション開始時にまず読む** |
 | `docs/README.md` | docs/ 全体の索引と階層構造の説明 |
 | `docs/ARCHITECTURE.md` | ゲーム全体のアーキテクチャ・状態管理・データフローの詳細 |
 | `docs/PS1_REDESIGN.md` | **PS1 表現パイプライン再設計の作業計画・失敗履歴・禁忌。 Phase 3 に触る前に必読** |
 | `docs/roadmap/PROJECT.md` | 今後の実装方針と優先度付きタスクリスト（Phase 順） |
 | `docs/roadmap/CAREER.md` | 本プロジェクトを学習媒体としたキャリア習得計画（SRE 転向） |
+| `docs/実績情報_取得マップ_確定版.md` | 開発者本人の実務実績の棚卸し（CAREER.md の現状スキル整理・Phase 2 の監視要件の根拠） |
 | `docs/ISSUES.md` | 既知の不具合・壊れているコード・修正が必要な箇所 |
 | `docs/CONVENTIONS.md` | コーディング規約・コメント言語・命名ルール |
-| `docs/infra/` | Phase 4 以降の運用・インフラ系ドキュメント置き場（現状ほぼ空） |
+| `docs/infra/INFRA.md` | Phase 4 の AWS 手動構築手順書（S3+CloudFront・Lambda+API Gateway+DynamoDB） |
+| `docs/infra/IAC_CHOICE.md` | IaC ツール選定（Terraform 採用）の判断記録 |
 | `README.md` | ユーザー向けのプロジェクト紹介・操作方法 |
 
 **作業開始前に必ず `docs/ISSUES.md` と `docs/roadmap/PROJECT.md` を確認してください。** 既に把握されている不具合や進行中のタスクを把握してから作業することで、重複や競合を避けられます。
@@ -111,7 +113,7 @@ PS1 風の効果を新規提案すると、ほぼ確実に過去の失敗を踏�
 
 ### Lambda バックエンド（`lambda/`）
 
-スコアランキング用の DynamoDB バックエンドです。`handler.ts` は POST `/scores` と GET `/scores/top` を実装済みで、`npm run typecheck` / `npm run build` ともに通る状態です。**ただしフロント側からの送信コードは未実装**のため、事実上未接続です（`docs/ISSUES.md` #15）。AWS 環境への実デプロイは `docs/roadmap/PROJECT.md` の Phase 4 で対応予定。
+スコアランキング用の DynamoDB バックエンドです。`handler.ts` は POST `/scores` と GET `/scores/top` を実装済みで、`npm run typecheck` / `npm run build` ともに通る状態です。フロント側の送信コード（`src/systems/Api.js`・`GameUI.jsx`）も実装済み（`docs/ISSUES.md` #15 で解決済み）。**未構築なのは AWS 側のインフラ実体（API Gateway / Lambda デプロイ / DynamoDB テーブル）のみ**です。構築手順は `docs/infra/INFRA.md` にまとめてあります。
 
 | コマンド | 用途 |
 |----------|------|
@@ -169,7 +171,7 @@ WASD と Shift は `PlayerController.jsx` 内で `document` に直接 keydown/ke
 
 ## 設計上の落とし穴（初見では気づきにくいもの）
 
-1. **AWS バックエンドはまだ存在しない。** Lambda（`lambda/src/handler.ts`）とフロント側送信コード（`src/systems/Api.js`、`GameUI.jsx` のクリア画面）は揃っているが、API Gateway / Lambda 実体 / DynamoDB テーブルは未構築。 `VITE_API_BASE` 未設定なので `Api.js` は no-op として動き、フロントは「オフラインモード」表示になる。Phase 4.1〜4.3 で構築する。
-2. **IaC・CI/CD・SRE は未着手。** `*.tf`、`.github/workflows/`、`docs/infra/INFRA.md` は未だ無い。 IaC ツールは Terraform で確定済（`docs/infra/IAC_CHOICE.md`）。 Phase 5〜7 で段階的に整備する。
-3. **`src/shaders/` は現在空ディレクトリ（`.gitkeep` のみ）。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は **試行後に不採用** ─ カメラ移動でテクスチャや頂点が揺れる動的アーティファクトが「ストレス要素にしか見えない」とユーザに却下された。 Bloodborne PSX 的な「**動的アーティファクトに頼らない静的ローファイ感**」を目指す方針へ転換し、 現在の PS1 表現は `<Canvas dpr={ps1Dpr}>`（内部 480px 域、 `src/App.jsx` の `PS1_TARGET_WIDTH=480`）＋ `NearestFilter`（壁テクスチャ）＋ Fog ＋ `PostFX.jsx`（控えめな Bloom / Noise / Vignette）の組み合わせで担う。 ディザは過去試行→却下されており未実装。 再挑戦の計画と禁忌は `docs/PS1_REDESIGN.md §2 Step 5` / `§3 禁忌 #4`。
+1. **AWS バックエンドはまだ存在しない。** Lambda（`lambda/src/handler.ts`）とフロント側送信コード（`src/systems/Api.js`、`GameUI.jsx` のクリア画面）は揃っているが、API Gateway / Lambda 実体 / DynamoDB テーブルは未構築。 `VITE_API_BASE` 未設定なので `Api.js` は no-op として動き、フロントは「オフラインモード」表示になる。構築手順は `docs/infra/INFRA.md` に整備済み（Milestone 4.1〜4.3）。
+2. **IaC・CI/CD・SRE は未着手。** `*.tf`、`.github/workflows/`、`docs/infra/SLO.md`・`POSTMORTEM.md` は未だ無い（手動構築手順の `docs/infra/INFRA.md` は Phase 4 分のみ整備済み）。 IaC ツールは Terraform で確定済（`docs/infra/IAC_CHOICE.md`）。 Phase 5〜7 で段階的に整備する。
+3. **`src/shaders/` は現在空ディレクトリ（`.gitkeep` のみ）。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は試行後にユーザ却下済み（禁忌）。現在の PS1 表現の構成要素・進捗・再挑戦の計画と禁忌は **`docs/PS1_REDESIGN.md` に一本化**してある。PS1 表現に触る前に必読（本ファイル冒頭「PS1 表現（Phase 3）に触る場合は必読」を参照）。
 4. **`PostFX.jsx` は薄めの設定。** Bloom / Noise / Vignette を控えめに重ねている。重い・崩れる場合は `PostFX.jsx` の `ENABLED = false` または `App.jsx` の `<PostFX />` を外す。
