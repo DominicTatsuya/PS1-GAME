@@ -19,18 +19,16 @@
 
 ## Priority: Medium（環境制約）
 
-### Issue #14 — ローカル環境の Node.js バージョンが古い
+### Issue #14 — Node.js バージョンは nvm で切替える運用（環境前提）
 
-**現象**: `node --version` が `v14.18.0` を返す。プロジェクトは Node 18 以上が要件（`package.json` の `engines` で明示済み）。
+**状況**: 既定の `node --version` は `v14.18.0`（別プロジェクトで必要なため）。本プロジェクトは Node 18 以上が要件（`package.json` の `engines`）、実用上は 20.19.x / 22.x。
 
-- ESLint 9 は `Object.hasOwn` を使うため Node 16.9+ が必須
-- Vite 7 / rolldown-vite は `??=` 演算子を含むため Node 15+ が必須
-- その結果、ローカルで `npm run lint` / `npm run build` が一切動かない
+- ESLint 9 は Node 16.9+、Vite 7 / rolldown-vite は Node 15+ が必須
+- ユーザは `nvm list` で必要なバージョンを確認し、作業ごとに都度切替えている
 
-**対応方針**:
-- ユーザ側で Node.js 18 LTS 以降（推奨 20 LTS）にバージョンアップする必要あり。
-- nvm-windows / fnm / volta のいずれかで管理するのが安全。
-- Node を更新後、`npm ci` でクリーンインストール → `npm run lint && npm run build` を通す。
+**運用**:
+- 本プロジェクトの作業時は `nvm use <20.19.x>` に切替えてから `npm ci` / `npm run lint` / `npm run build` を実行する。
+- これは不具合ではなく前提。Claude は v14 が既定であることを問題として繰り返し指摘しない。
 
 ---
 

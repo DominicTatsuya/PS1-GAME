@@ -9,7 +9,7 @@
 
 本作は **React 19 + @react-three/fiber + Three.js** で構築された、一人称視点の 3D ダンジョン探索ゲームです。
 
-- Lambda バックエンド（スコアランキング API）は `lambda/` 配下に、フロント側の送信コード（`Api.js`）も実装済み（`ISSUES.md` #15 解決済み）。未構築なのは AWS 側のインフラ実体（API Gateway / Lambda デプロイ / DynamoDB テーブル）のみ。構築手順は `docs/infra/INFRA.md`
+- スコアランキング API は `lambda/` とフロント側 `Api.js` が実装済み。AWS 側の実体は未構築（`docs/infra/INFRA.md` と `HANDOFF.md` 参照）
 - SPA。ルーティング無し
 - 画面遷移はゲーム状態（`isLocked` / `cleared`）で切り替わる
 
@@ -31,7 +31,7 @@
 │  ├─ MapGenerator.js（迷路生成・座標変換・衝突）│
 │  └─ TextureGenerator.js（Canvas 手続きテクスチャ）│
 ├────────────────────────────────────────────────┤
-│ data/config.js（ゲーム定数・※一部未接続）       │
+│ data/config.js（ゲーム定数・難易度プリセット）  │
 └────────────────────────────────────────────────┘
 ```
 
@@ -107,8 +107,7 @@ bfsFarthest(grid, 1, 1)  ─── スタート(1,1)から最も遠い地点を�
 findDeadEnds(grid) / findJunctions(grid)
  │
  │ アイテム候補: 行き止まりを優先、不足したら通路セルで補充（最大5個）
- │ 松明候補: 分岐点 + 行き止まり + 直線通路の30%
- │ 松明は「互いにマンハッタン距離4以上」でフィルタ（最大25本）
+ │ 松明候補: 分岐点 + 行き止まり + 直線通路の一部（本数・確率は config.js の TORCH）
  │
  ▼
 返り値: { grid, gridW, gridH, cellSize, wallHeight,
@@ -184,7 +183,7 @@ if (!checkGridCollision(newPosZ, ...)) camera.position.z = newPosZ.z;
 
 - 各松明は壁面に貼り付く形で配置（`wallDirs` から壁方向を決定）。
 - `pointLight` を持ち、`useFrame` 内で `intensity` をランダムに揺らして炎の演出。
-- 分岐点・行き止まり・直線通路の一部を候補にし、互いにマンハッタン距離5以上離れるようフィルタしたうえで、難易度別の上限（`TORCH.MAX_COUNT`、Normal/Easy=30・Hard=20）まで配置。WebGL の動的ライト数上限への配慮でこの上限を設けている。
+- 配置ルール（距離フィルタ・上限本数）は `MapGenerator.js` と `config.js` の `TORCH` が正。WebGL の動的ライト数上限への配慮で上限を設けている。
 
 ### 4.5 プレイヤーランタン（`PlayerController.jsx` 内）
 
@@ -278,45 +277,8 @@ App.setNearItem(closest)
 
 ---
 
-## 9. 既知の設計上の妥協・制限
+## 9. 既知の制限
 
-- **AWS インフラは未構築。** Lambda・フロント送信コードは実装済み（§1 参照）。API Gateway / Lambda 実体 / DynamoDB テーブルが未構築で、構築手順は `docs/infra/INFRA.md` にまとめてある。
-- **設定 UI（音量・感度等）なし。** Audio システム自体は実装済み（`src/systems/Audio.js`）だが、UI からの調整手段は未整備。
-- **AWS 公開・IaC・CI/CD は全て未着手。** S3+CloudFront 配信・DynamoDB 等の手動構築手順は `docs/infra/INFRA.md` に整備済みだが実施はこれから。Terraform 等の IaC、GitHub Actions、CloudWatch SRE は新 ROADMAP の Phase 5〜7 で段階的に整備する計画（`roadmap/PROJECT.md`）。
-- **PS1 表現は方針転換済み。** Phase 3.1（頂点スナップ）・3.2（アフィンテクスチャ）は試行後に不採用、ディザも過去試行→却下されており未実装。現行の PS1 表現の構成要素・進行中の再設計計画・禁忌は `docs/PS1_REDESIGN.md` に一本化（単一の真実の源）。
+- 設定 UI（音量・感度等）なし。Audio システム自体は実装済み（`src/systems/Audio.js`）だが、UI からの調整手段は未整備。
+- AWS 側・IaC・CI/CD の状況は `HANDOFF.md`、PS1 表現の方針は `PS1_REDESIGN.md` を参照。
 
-過去の制限のうち、現在は解決済みのもの（参考）:
-
-- ~~敵・動的オブジェクトが存在しない~~ → `Enemy.jsx`（BFS 追跡）、`Trap.jsx`、`Door.jsx` / `KeyItem.jsx` を実装済
-- ~~サウンドなし~~ → `src/systems/Audio.js`（Web Audio API 手続き合成）を実装済
-- ~~スコア/タイムの永続化なし~~ → `src/systems/Storage.js`（localStorage）を実装済
-
----
-
-## 10. 参照すべきファイル（一覧）
-
-| ファイル | 役割 |
-|---------|------|
-| `src/App.jsx` | 状態管理とシーン構成のハブ |
-| `src/systems/MapGenerator.js` | 迷路生成・座標変換・衝突判定 |
-| `src/systems/TextureGenerator.js` | 手続きテクスチャ生成 |
-| `src/components/PlayerController.jsx` | WASD 移動・衝突・ヘッドボブ・ランタン |
-| `src/components/Structure.jsx` | InstancedMesh 壁描画 |
-| `src/components/Floor.jsx` / `Ceiling.jsx` | 床・天井 |
-| `src/components/Torch.jsx` | 松明（揺らぎライト） |
-| `src/components/CollectibleItem.jsx` | 収集アイテム |
-| `src/components/KeyItem.jsx` | 鍵アイテム（ドアを開ける） |
-| `src/components/Door.jsx` | ドア（閉じている時は衝突判定で壁扱い） |
-| `src/components/Trap.jsx` | スパイクトラップ（踏むとスタミナ減） |
-| `src/components/Enemy.jsx` | 敵 AI（視界内のプレイヤーを BFS 経路で追跡） |
-| `src/components/Goal.jsx` | 出口ポータル |
-| `src/components/UI/GameUI.jsx` | HUD・タイトル・クリア画面 |
-| `src/components/UI/Minimap.jsx` | ミニマップ（霧の戦場） |
-| `src/components/UI/NearItemIndicator.jsx` | [E] プロンプト |
-| `src/systems/Storage.js` | localStorage 永続化（ベスト記録・難易度・音量・ユーザ名） |
-| `src/systems/Audio.js` | Web Audio API 手続き合成 SE・BGM |
-| `src/systems/Api.js` | ランキング API クライアント（POST /scores・GET /scores/top）。 `VITE_API_BASE` 未設定時は no-op |
-| `src/components/PostFX.jsx` | PS1 風ポストプロセス（Bloom / Noise / Vignette を薄く重ねる） |
-| `src/data/config.js` | ゲーム定数 + 難易度プリセット + `applyDifficulty` |
-| `src/styles/App.css` | CRT スキャンライン・ビネット |
-| `tests/MapGenerator.test.js` | `MapGenerator` 純粋関数の Vitest 単体テスト |

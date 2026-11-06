@@ -32,7 +32,7 @@ Phase 単位の状態だけをまとめる。
 
 | Phase | 内容 | 状態 |
 |---|---|---|
-| 0 | 基盤整備 | 完了（lint/build のグリーン化のみ Node バージョン更新待ち → §4） |
+| 0 | 基盤整備 | 完了（Node は nvm で切替運用 → §4） |
 | 1 | ゲームプレイ拡張（スコア永続化・難易度・サウンド・ミニマップ） | 完了 |
 | 2 | 世界観（ドア/鍵・トラップ・敵 AI） | 完了 |
 | 3 | PS1 表現の深化（創作トラック） | **進行中**。詳細は §3・`PS1_REDESIGN.md` |
@@ -44,6 +44,33 @@ Phase 単位の状態だけをまとめる。
 ---
 
 ## §3 今アクティブな作業とその状態
+
+### 2026-11-06 時点の現在値
+
+- コード最終変更は 2026-06-09（`b9f68b4`）。以降の commit は docs のみ。
+- AWS 側（S3+CloudFront / Lambda+API GW / DynamoDB）は**未構築**。手順書 `infra/INFRA.md` は整備済みだが実施ゼロ。
+- PS1 表現 Step 2〜5 は**当面保留**（創作の磨き込みで任意。Phase 4〜7 のブロッカーではない）。
+
+### Claude 開発の区切り判定（2026-11-06）
+
+ゲームとしてはコンテンツ十分と判断。Claude による開発はここで一区切りとし、別プロジェクトへリソースを回してよい。
+
+| 観点 | 状態 |
+|---|---|
+| ゲーム本体 | Phase 0〜2 完了（迷路・アイテム/鍵/ドア・罠・敵 AI・難易度・サウンド・ミニマップ・スコア永続化） |
+| フロント↔API | `Api.js` / `GameUI.jsx` / `lambda/src/handler.ts` 実装済み。`VITE_API_BASE` を設定すれば疎通する |
+| 残りの必須作業 | すべて AWS 実地作業（`infra/INFRA.md` §2〜§5）。理解が目的なのでユーザ自身がコンソール/CLI で実施する |
+
+Claude が再び必要になりうるのは、Phase 5 の Terraform を段階的に書くとき、Phase 7.2 の GitHub Actions、PS1 Step 2〜5 に再挑戦するときのみ。
+
+### AWS 作業の最短ルート
+
+`roadmap/SAA_ROADMAP.md` §3 の A0→A1→A2 に対応。接続あり・課金ありの作業なので社外ネットワークで行う。
+
+1. **A0**: `nvm use <20.19.x>` で切替 → `npm run lint && npm run test && npm run build` が緑になることを確認（`/verify`）。
+2. **A1**: `infra/INFRA.md` §2（S3 + CloudFront）。成果物 = 公開 URL。
+3. **A2**: `infra/INFRA.md` §3 → §5（DynamoDB → Lambda → API Gateway → CORS → curl 疎通 → `VITE_API_BASE` 設定 → 再ビルド → E2E）。成果物 = 動くオンラインランキング。
+4. 完了したら `INFRA.md` §6 のチェックと §8 履歴、`roadmap/PROJECT.md` の Milestone 4.1/4.2/4.3、本ファイル §2/§3 を更新する。
 
 ### Phase 3: PS1 表現（`docs/PS1_REDESIGN.md` が単一の真実の源）
 
@@ -65,9 +92,9 @@ Phase 単位の状態だけをまとめる。
 
 ## §4 既知のブロッカー・環境制約
 
-- **ローカル環境の Node.js が v14.18.0 のまま**（`node --version` で確認済み、2026-08-26 時点）。プロジェクトは `>=18`、実用上は Node 20.19.x LTS / 22.x LTS が必要（`ISSUES.md` #14）。このため `npm run lint` / `npm run build` がローカルで実行できない。
-  - 対応: **ユーザ側で Node のバージョンアップが必要**（nvm-windows 等）。Claude からは実行不可。
-- その他の未解決 Issue（Low〜Nice-to-have、動作への影響は小さい）: `ISSUES.md` #8（lint 警告の未確認）、#9（E キー競合の注意点）、#11（テストカバレッジ拡大）、#12（`.vscode/settings.json` の TS/JS 設定混在）。詳細は `docs/ISSUES.md` を参照。
+- **Node.js は nvm で切替える運用**。既定は v14.18.0（別プロジェクトの都合）だが、`nvm list` で必要なバージョンを確認でき、作業ごとに都度切替えている。本プロジェクトは実用上 Node 20.19.x LTS / 22.x LTS が必要（`ISSUES.md` #14）。ブロッカーではなく前提。
+  - Claude は `node --version` が v14 でも、これを問題として指摘しない。lint / build / test の実行時にユーザ側で切替済みか、またはエラー時に切替を依頼する。
+- その他の未解決 Issue は Low〜Nice-to-have のみ。`ISSUES.md` を参照。
 
 ---
 
@@ -79,20 +106,12 @@ Phase 単位の状態だけをまとめる。
 |---|---|
 | 2026-06-08 | PS1 頂点スナップ／アフィンテクスチャ／ディザを試行→いずれもユーザ却下、方針を再設計（`PS1_REDESIGN.md` 新設） |
 | 2026-06-09 | PS1_REDESIGN Step 1 の目視確認 OK・`develop` へマージ（`b9f68b4`）。fog 値 `(8, 32)` を先行確定。直後にドキュメント間の齟齬を修正（`5e5f302`） |
-| 2026-08-26 | `docs/` の重複記述を整理し、本 `HANDOFF.md` を新設。**この時点でコード上の進捗に変化はなし**（直近のコード変更は 2026-06-09 の `b9f68b4` のまま、Node バージョンも v14.18.0 のまま） |
-| 2026-09-08 | `docs/実績情報_取得マップ_確定版.md` を追加し、Phase 6（可観測性）の位置づけを `PROJECT.md`/`CAREER.md` に反映。続けて `docs/infra/INFRA.md`（Phase 4 手動構築手順書）を新設し、`docs/` 全体の重複・陳腐化を整理: `ARCHITECTURE.md`/`CLAUDE.md` に残っていた「フロント送信コード未実装」という stale な記述（実際は実装済み）を3箇所修正、`ISSUES.md` #4（頂点スナップ実装）に後の却下・削除を反映した訂正を追記、`CONVENTIONS.md` §8 の commit ポリシーを `CLAUDE.md` の現行方針と整合させて修正、ルート `README.md` の fog/dpr/松明の数値誤りと Phase2-4 の記載漏れを修正、`CAREER.md`/`SAA_ROADMAP.md` 間で重複していたポートフォリオ・チェックリストを `CAREER.md` 側に一本化。**この時点でコード上の進捗に変化はなし（ドキュメントのみ）** |
+| 2026-08-26 | `docs/` の重複記述を整理し、本 `HANDOFF.md` を新設（コード変更なし） |
+| 2026-09-08 | `実績情報_取得マップ_確定版.md` と `infra/INFRA.md`（Phase 4 手動構築手順書）を新設。docs 間の齟齬を修正（コード変更なし） |
+| 2026-11-06 | 現在値を再整理。コンテンツは十分と判断し Claude 開発を一区切りに（§3）。残作業は AWS 手動構築のみで、最短ルートを §3 に追記。Node は nvm 切替運用が前提である旨を §4 に明記。**コード変更なし（ドキュメントのみ）** |
 
 ---
 
 ## §6 ドキュメント地図
 
-一覧と各ファイルの責務は `docs/README.md` を参照。よく使うものだけ再掲:
-
-| 目的 | ファイル |
-|---|---|
-| PS1 表現に触る前に必読 | `docs/PS1_REDESIGN.md` |
-| 既知のバグ・修正待ち | `docs/ISSUES.md` |
-| Phase 別の実装ロードマップ詳細 | `docs/roadmap/PROJECT.md` |
-| アーキテクチャ・状態管理の詳細 | `docs/ARCHITECTURE.md` |
-| コーディング規約 | `docs/CONVENTIONS.md` |
-| 次に何をやるかの候補提示 | `/next-task` skill |
+索引は `docs/README.md`。次に何をやるかは `/next-task` skill。

@@ -113,7 +113,7 @@ PS1 風の効果を新規提案すると、ほぼ確実に過去の失敗を踏�
 
 ### Lambda バックエンド（`lambda/`）
 
-スコアランキング用の DynamoDB バックエンドです。`handler.ts` は POST `/scores` と GET `/scores/top` を実装済みで、`npm run typecheck` / `npm run build` ともに通る状態です。フロント側の送信コード（`src/systems/Api.js`・`GameUI.jsx`）も実装済み（`docs/ISSUES.md` #15 で解決済み）。**未構築なのは AWS 側のインフラ実体（API Gateway / Lambda デプロイ / DynamoDB テーブル）のみ**です。構築手順は `docs/infra/INFRA.md` にまとめてあります。
+スコアランキング用の DynamoDB バックエンド（POST `/scores`・GET `/scores/top`）。コードは実装済みで、AWS 側の実体のみ未構築（手順は `docs/infra/INFRA.md`）。
 
 | コマンド | 用途 |
 |----------|------|
@@ -171,7 +171,7 @@ WASD と Shift は `PlayerController.jsx` 内で `document` に直接 keydown/ke
 
 ## 設計上の落とし穴（初見では気づきにくいもの）
 
-1. **AWS バックエンドはまだ存在しない。** Lambda（`lambda/src/handler.ts`）とフロント側送信コード（`src/systems/Api.js`、`GameUI.jsx` のクリア画面）は揃っているが、API Gateway / Lambda 実体 / DynamoDB テーブルは未構築。 `VITE_API_BASE` 未設定なので `Api.js` は no-op として動き、フロントは「オフラインモード」表示になる。構築手順は `docs/infra/INFRA.md` に整備済み（Milestone 4.1〜4.3）。
-2. **IaC・CI/CD・SRE は未着手。** `*.tf`、`.github/workflows/`、`docs/infra/SLO.md`・`POSTMORTEM.md` は未だ無い（手動構築手順の `docs/infra/INFRA.md` は Phase 4 分のみ整備済み）。 IaC ツールは Terraform で確定済（`docs/infra/IAC_CHOICE.md`）。 Phase 5〜7 で段階的に整備する。
+1. **AWS バックエンドは未構築。** `VITE_API_BASE` 未設定なので `Api.js` は no-op（オフラインモード）。現状・手順は `docs/HANDOFF.md` と `docs/infra/INFRA.md`。
+2. **IaC・CI/CD・SRE は未着手。** IaC は Terraform で確定（`docs/infra/IAC_CHOICE.md`）。
 3. **`src/shaders/` は現在空ディレクトリ（`.gitkeep` のみ）。** Phase 3.1（頂点スナップ）と 3.2（アフィンテクスチャ）は試行後にユーザ却下済み（禁忌）。現在の PS1 表現の構成要素・進捗・再挑戦の計画と禁忌は **`docs/PS1_REDESIGN.md` に一本化**してある。PS1 表現に触る前に必読（本ファイル冒頭「PS1 表現（Phase 3）に触る場合は必読」を参照）。
 4. **`PostFX.jsx` は薄めの設定。** Bloom / Noise / Vignette を控えめに重ねている。重い・崩れる場合は `PostFX.jsx` の `ENABLED = false` または `App.jsx` の `<PostFX />` を外す。

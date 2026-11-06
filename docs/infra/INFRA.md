@@ -4,16 +4,13 @@
 
 - **DynamoDB のテーブルスキーマ・属性設計・GSI・CLI 作成例**は `../../lambda/DYNAMODB.md` が単一の真実の源です。本ドキュメントでは再掲せず、該当ステップから参照します。
 - **Terraform への移行**は Phase 5（`docs/infra/IAC_CHOICE.md` で選定済み）で行います。ここで手動構築する内容がそのまま Phase 5.2 の入力（`frontend_hosting.tf` / `api.tf` / `database.tf` / `iam.tf` の材料）になるので、§1 のリソース命名規則はそのまま Terraform 側でも使えるように決めています。
-- 本ドキュメント自体はまだ**手順書**であり、実際の構築ログではありません（チェックボックスは未実施）。実際に構築したら §9 変更履歴に日付付きで記録してください。
+- 本書は**手順書**です（未実施）。構築したら §8 に日付付きで記録してください。
 
 ---
 
 ## §0 前提・スコープ
 
-**すでにあるもの**（コード側は実装済み）:
-- `lambda/src/handler.ts` — POST `/scores` / GET `/scores/top` の Lambda ハンドラ（`npm run typecheck` / `npm run build` 通過済み）
-- `src/systems/Api.js` — フロント側の fetch クライアント（`VITE_API_BASE` 未設定時は no-op）
-- `src/components/UI/GameUI.jsx` — クリア画面のスコア送信 UI、スタート画面の Online Top10 表示
+**すでにあるもの**: Lambda ハンドラ（`lambda/src/handler.ts`）、フロント送信コード（`Api.js` / `GameUI.jsx`）。`VITE_API_BASE` 未設定時は no-op。
 
 **ここで作るもの**（AWS 側の実体、これが無いため現状「オフラインモード」で動いている）:
 - S3 バケット + CloudFront ディストリビューション（フロント配信）
@@ -183,15 +180,7 @@ Phase 7.2（CI/CD）では、この `.env.local` への手動書き込みを Git
 
 ---
 
-## §8 このあとの工程
-
-- **Phase 5**（`docs/infra/IAC_CHOICE.md`）: この手順で作った構成を Terraform（`frontend_hosting.tf` / `api.tf` / `database.tf` / `iam.tf`）でコード化
-- **Phase 6**（`docs/infra/SLO.md` / `POSTMORTEM.md`、未作成）: この API に対して CloudWatch 監視・SLO・ポストモーテムを追加
-- **Phase 7.2**: GitHub Actions で §2 の再ビルド・再アップロードと §5 の env 注入を自動化
-
----
-
-## §9 変更履歴
+## §8 変更履歴
 
 | 日付 | 内容 |
 |---|---|

@@ -151,15 +151,6 @@ PS1-GAME/
 | **リンター** | ESLint | ^9.36.0 | コード品質チェック |
 | **パッケージ管理** | npm | - | 依存関係管理 |
 
-### 技術的詳細
-
-- **迷路生成**: Recursive Backtracker + mulberry32シード乱数
-- **衝突判定**: グリッドベース Circle-vs-AABB（X/Z軸独立判定）
-- **レンダリング**: WebGL2、InstancedMesh、Canvas手続き生成テクスチャ
-- **PS1表現**: 画面幅に応じた動的dpr（上限0.65）、NearestFilter、flatShading、CSSスキャンライン
-- **パフォーマンス**: `high-performance` パワープリファレンス、InstancedMesh
-- **フレーム更新**: `useFrame` フックによるリアルタイム更新
-
 ---
 
 ## 🎮 操作方法
@@ -234,9 +225,6 @@ npm run lint
 ### ゲームプレイ要素
 - 複数フロア / レベルシステム
 - タイムアタックモード（ベストタイムは保存済みだが、専用モードとしては未実装）
-
-### インフラ・運用
-- AWS へのランキング API 実デプロイ（手順は `docs/infra/INFRA.md`）、Terraform による IaC 化、CI/CD、監視・SLO
 
 ### リファクタリング
 - TypeScriptへの移行

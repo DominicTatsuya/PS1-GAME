@@ -140,8 +140,7 @@ README や既存コミットの雰囲気から、以下の規約：
 - 例: `fix: 松明の配置・光源・外観を大幅改善`
 
 ### 8.1 Claude Code がコミットを作る場合
-- `.claude/settings.json` の deny ルールにより、Claude は `git add` / `git commit` を**一切実行できない**（ユーザに「コミットして」と言われた場合でも）。詳細は `CLAUDE.md`「Claude とユーザの役割分担」を参照
-- Claude はコミットを代行する代わりに、ユーザがそのまま実行できる具体的なコマンド（Co-Authored-By フッタを含むコミットメッセージ込み）を提示する
+- Claude は `git add` / `git commit` を実行できない。ユーザが実行できるコマンドを提示する（詳細は `CLAUDE.md`）。
 
 ---
 
@@ -166,18 +165,12 @@ README や既存コミットの雰囲気から、以下の規約：
 - バンドルサイズへの影響（Three.js ですでに重い）
 - メンテナンス状態（直近 1 年で更新があるか）
 
-### 10.2 推奨ライブラリ
-機能追加で以下は採用候補：
+### 10.2 方針
 
-| 用途 | 推奨 | 備考 |
-|------|------|------|
-| ポストプロセス | `@react-three/postprocessing` | Bloom/CRT など |
-| アニメーション | 既存の `useFrame` | 追加不要 |
-| サウンド | Web Audio API 直 | ライブラリ追加不要で十分 |
-| 状態管理 | React hooks のみ | Redux/Zustand は過剰 |
-| テスト | `vitest` | Vite とシームレス |
+- アニメーションは既存の `useFrame`、サウンドは Web Audio API 直、状態管理は React hooks のみ（Redux/Zustand は過剰）。
+- ポストプロセスは `@react-three/postprocessing`、テストは `vitest`（導入済み）。
 
-### 10.3 避けたいライブラリ
+### 10.3 避けたいもの
 - `three` の別バージョン（既に `^0.180.0` で固定。`@react-three/fiber` との互換性を崩さない）
 - 重厚な UI フレームワーク（MUI, Chakra 等 — PS1 風とのトンマナが合わない）
 

@@ -68,7 +68,7 @@ NG ならまず Step 内でパラメータ調整、それでも NG なら撤退�
 
 > 重要: 一度に複数 Step を進めない。 ユーザの目視確認をすっ飛ばすと、また「ブロックノイズに近く何の意図か分からない」のような結果になる。
 
-### Step 1: 内部レンダー解像度を PS1 域に固定 ✅ 実装完了（目視確認待ち）
+### Step 1: 内部レンダー解像度を PS1 域に固定 ✅ 完了（目視確認 OK、`b9f68b4`）
 
 - **実装ファイル**: `src/App.jsx`
   - 定数 `PS1_TARGET_WIDTH = 480`（PS1 native 320〜640 の中間値）
@@ -76,9 +76,6 @@ NG ならまず Step 内でパラメータ調整、それでも NG なら撤退�
   - `<Canvas dpr={ps1Dpr}>` に切り替え（旧 `dpr={0.65}`）
 - **既存依存**: `src/styles/App.css` の `image-rendering: pixelated`（既存）で NearestFilter upscale が効く
 - **目的**: 画面幅問わず内部レンダー幅 ~480px に固定。 旧 dpr=0.65 は modern 解像度に依存するため PS1 風効果が浮いてしまう問題を解消する土台
-- **数値の調整**:
-  - `PS1_TARGET_WIDTH = 320` → より粗い（Silent Hill SD 出力相当）
-  - `PS1_TARGET_WIDTH = 640` → 控えめ（PS1 高解像度モード）
 
 ### Step 2: Floor / Ceiling を per-cell に subdivide ⏸ 待機
 
@@ -124,11 +121,10 @@ NG ならまず Step 内でパラメータ調整、それでも NG なら撤退�
 - **量子化レベル**: PS1 R5G6B5 を模して R=32, G=64, B=32 にするか、簡易に 16 段階一律
 - **必須条件**: dither の見た目が「画面前面の格子」ではなく「テクスチャ内の縞」に見えること
 
-### Step 6: fog 値の調整 ⏸ 待機
+### Step 6: fog 値の調整 🔶 先行実施済み（`(8, 32)` で暫定 OK）
 
 - **対象**: `src/App.jsx` の `<fog attach="fog" args={["#141210", 8, 32]} />`
-- **候補**: BBPSX 寄り `(6, 22)` などへ濃く
-- **タイミング**: 全パイプライン（Step 1〜5）が揃ってから最終調整。 途中で動かすと他 Step の評価が混ざる
+- **今後**: Step 2〜5 が入った場合のみ再調整の余地あり（候補: BBPSX 寄り `(6, 22)`）
 
 ---
 
@@ -173,10 +169,6 @@ NG ならまず Step 内でパラメータ調整、それでも NG なら撤退�
 | `src/App.jsx` `<Canvas ...>` | `gl.antialias` | `false` | アンチエイリアス無効（変更厳禁） |
 | `src/styles/App.css:32` | `image-rendering: pixelated` | (有効) | NearestFilter upscale（変更厳禁） |
 
-未実装（Step 進行に伴い追加される予定）:
-- `applyPs1VertexSnap` の snap 解像度（Step 3 で復活）
-- `applyPs1AffineTexture` の有効/無効（Step 4 で復活）
-- ディザの levels / strength / 適用方式（Step 5 で再設計）
 
 ---
 
@@ -201,6 +193,4 @@ NG ならまず Step 内でパラメータ調整、それでも NG なら撤退�
 4. パラメータ調整でも NG なら、**撤退して §3 禁忌に追記**（何故ダメだったかも残す）
 5. Step 進行に応じて §4 進捗ログと §5 チューニングノブを更新
 
-`/verify` は本リポジトリ専用 skill（`.claude/skills/verify/SKILL.md`）。 Node v20.19+ で
-動作する。 Node v14 系では `Object.hasOwn` や `??=` で失敗するため、ユーザに
-`nvm use 20.19.4` を依頼すること（Claude 側からは管理者権限で実行不可）。
+`/verify` は本リポジトリ専用 skill（`.claude/skills/verify/SKILL.md`）。
